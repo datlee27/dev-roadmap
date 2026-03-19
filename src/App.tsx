@@ -1,6 +1,6 @@
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from 'react';
 import { PHASES, PRIORITY_META, RULES, SCHEDULE, TRACKS } from './data';
-import { Phase, PhaseId, PhaseTaskItem, TaskItem, TaskPriority } from './types';
+import { Phase, PhaseId, PhaseTaskItem, Step, TaskItem, TaskPriority } from './types';
 
 const ROADMAP_STORAGE_KEY = 'dev-roadmap-v2-progress';
 const LEGACY_ROADMAP_STORAGE_KEY = 'dev-roadmap-v1';
@@ -93,6 +93,78 @@ const formatStamp = (value: string): string =>
     hour: '2-digit',
     minute: '2-digit',
   });
+
+interface PhaseStepItemProps {
+  step: Step;
+  isDone: boolean;
+  noteValue: string;
+  onToggle: () => void;
+  onNoteChange: (note: string) => void;
+}
+
+function PhaseStepItem({ step, isDone, noteValue, onToggle, onNoteChange }: PhaseStepItemProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [showNote, setShowNote] = useState(Boolean(noteValue.trim()));
+
+  useEffect(() => {
+    if (noteValue.trim() && !showNote) {
+      setShowNote(true);
+    }
+  }, [noteValue, showNote]);
+
+  return (
+    <article className={`phase-step-item ${isDone ? 'done' : ''} ${expanded ? 'expanded' : ''}`}>
+      <div className="phase-step-head">
+        <label className="phase-step-main">
+          <input type="checkbox" checked={isDone} onChange={onToggle} />
+          <span>{step.title}</span>
+        </label>
+
+        <div className="phase-step-actions">
+          <button
+            type="button"
+            className={`mini-icon-btn ${showNote || noteValue.trim() ? 'active' : ''}`}
+            onClick={() => setShowNote((prev) => !prev)}
+            aria-label="Bật/tắt ghi chú"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.5 8.5h11M6.5 12h11M6.5 15.5h7" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            className={`mini-icon-btn ${expanded ? 'active' : ''}`}
+            onClick={() => setExpanded((prev) => !prev)}
+            aria-label="Mở rộng nội dung"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className={expanded ? 'rotated' : ''}>
+              <path d="M7 10l5 5 5-5" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {(expanded || showNote) && (
+        <div className="phase-step-body">
+          {expanded && <p className="phase-step-detail">{step.detail}</p>}
+
+          {showNote && (
+            <label className="phase-step-note">
+              <span>GHI CHU</span>
+              <textarea
+                rows={4}
+                value={noteValue}
+                onChange={(event) => onNoteChange(event.target.value)}
+                placeholder="Ghi insight, link tài liệu, câu hỏi cần hỏi senior..."
+              />
+            </label>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
 
 function App() {
   const [activeSection, setActiveSection] = useState<NavSection>('overview');
@@ -241,10 +313,10 @@ function App() {
       prev.map((task) =>
         task.id === taskId
           ? {
-              ...task,
-              ...patch,
-              updatedAt: new Date().toISOString(),
-            }
+            ...task,
+            ...patch,
+            updatedAt: new Date().toISOString(),
+          }
           : task,
       ),
     );
@@ -262,10 +334,10 @@ function App() {
       prev.map((task) =>
         task.id === taskId
           ? {
-              ...task,
-              ...patch,
-              updatedAt: new Date().toISOString(),
-            }
+            ...task,
+            ...patch,
+            updatedAt: new Date().toISOString(),
+          }
           : task,
       ),
     );
@@ -377,7 +449,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">DEV MAP TSX</div>
+        <div className="brand">DAT DEV MAP</div>
         <nav className="topnav">
           {sections.map((section) => (
             <button
@@ -529,29 +601,14 @@ function App() {
                               const noteValue = stepNotes[step.id] ?? '';
 
                               return (
-                                <div key={step.id} className={`step-row ${isDone ? 'done' : ''}`}>
-                                  <div className="step-main">
-                                    <input
-                                      type="checkbox"
-                                      checked={isDone}
-                                      onChange={() => toggleStep(step.id)}
-                                    />
-                                    <div>
-                                      <strong>{step.title}</strong>
-                                      <p>{step.detail}</p>
-                                    </div>
-                                  </div>
-
-                                  <label className="step-note-field">
-                                    Ghi chú bước này
-                                    <textarea
-                                      rows={2}
-                                      value={noteValue}
-                                      onChange={(event) => updateStepNote(step.id, event.target.value)}
-                                      placeholder="Ví dụ: cần ôn lại phần useEffect cleanup..."
-                                    />
-                                  </label>
-                                </div>
+                                <PhaseStepItem
+                                  key={step.id}
+                                  step={step}
+                                  isDone={isDone}
+                                  noteValue={noteValue}
+                                  onToggle={() => toggleStep(step.id)}
+                                  onNoteChange={(note) => updateStepNote(step.id, note)}
+                                />
                               );
                             })}
                           </div>
