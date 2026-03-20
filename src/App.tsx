@@ -1,6 +1,17 @@
-import { CSSProperties, FormEvent, useEffect, useMemo, useState } from 'react';
-import { PHASES, PRIORITY_META, RULES, SCHEDULE, TRACKS } from './data';
-import { Phase, PhaseId, PhaseTaskItem, Step, TaskItem, TaskPriority } from './types';
+import { CSSProperties, DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import AppFooter from './components/layout/AppFooter';
+import AppHeader from './components/layout/AppHeader';
+import LeftDashboard from './components/layout/LeftDashboard';
+import { NavItem, NavSection } from './@types/navigation';
+import { ScheduleDayId, ScheduleDraft, ScheduleEventItem, WeekDayItem } from './@types/schedule';
+import { PHASES, PRIORITY_META, TRACKS } from './data';
+import AppLayout from './layouts/AppLayout';
+import NotesPage from './pages/NotesPage';
+import OverviewPage from './pages/OverviewPage';
+import PhasePage from './pages/PhasePage';
+import SchedulePage from './pages/SchedulePage';
+import TasksPage from './pages/TasksPage';
+import { Phase, PhaseId, PhaseTaskItem, TaskItem, TaskPriority } from './types';
 
 const ROADMAP_STORAGE_KEY = 'dev-roadmap-v2-progress';
 const LEGACY_ROADMAP_STORAGE_KEY = 'dev-roadmap-v1';
@@ -8,8 +19,7 @@ const TASK_STORAGE_KEY = 'dev-roadmap-v2-tasks';
 const PHASE_TASK_STORAGE_KEY = 'dev-roadmap-v2-phase-tasks';
 const STEP_NOTE_STORAGE_KEY = 'dev-roadmap-v2-step-notes';
 const GENERAL_NOTE_STORAGE_KEY = 'dev-roadmap-v2-general-note';
-
-type NavSection = 'overview' | PhaseId | 'schedule' | 'tasks' | 'notes';
+const SCHEDULE_STORAGE_KEY = 'dev-roadmap-v3-schedule';
 type StepNoteMap = Record<string, string>;
 
 interface TaskDraft {
@@ -28,6 +38,59 @@ interface PhaseNoteItem {
   updatedAt?: string;
 }
 
+const WEEK_DAYS: WeekDayItem[] = [
+  { id: 'mon', label: 'Thứ 2', shortLabel: 'Mon' },
+  { id: 'tue', label: 'Thứ 3', shortLabel: 'Tue' },
+  { id: 'wed', label: 'Thứ 4', shortLabel: 'Wed' },
+  { id: 'thu', label: 'Thứ 5', shortLabel: 'Thu' },
+  { id: 'fri', label: 'Thứ 6', shortLabel: 'Fri' },
+  { id: 'sat', label: 'Thứ 7', shortLabel: 'Sat' },
+  { id: 'sun', label: 'Chủ nhật', shortLabel: 'Sun' },
+];
+
+const DAY_ORDER: Record<ScheduleDayId, number> = {
+  mon: 0,
+  tue: 1,
+  wed: 2,
+  thu: 3,
+  fri: 4,
+  sat: 5,
+  sun: 6,
+};
+
+const CALENDAR_START_HOUR = 6;
+const CALENDAR_END_HOUR = 23;
+const CALENDAR_SLOT_MINUTES = 30;
+const CALENDAR_START_MINUTE = CALENDAR_START_HOUR * 60;
+const CALENDAR_END_MINUTE = CALENDAR_END_HOUR * 60;
+const CALENDAR_SLOT_COUNT = (CALENDAR_END_MINUTE - CALENDAR_START_MINUTE) / CALENDAR_SLOT_MINUTES;
+const CALENDAR_HOUR_MARKERS = Array.from(
+  { length: CALENDAR_END_HOUR - CALENDAR_START_HOUR },
+  (_, index) => CALENDAR_START_HOUR + index,
+);
+const SCHEDULE_COLORS: { value: string; label: string }[] = [
+  { value: '#61dafb', label: 'Sky' },
+  { value: '#f89820', label: 'Orange' },
+  { value: '#ff6b35', label: 'Coral' },
+  { value: '#34d399', label: 'Mint' },
+  { value: '#c084fc', label: 'Violet' },
+  { value: '#f0da48', label: 'Amber' },
+  { value: '#ff7a90', label: 'Rose' },
+];
+
+const DEFAULT_SCHEDULE_EVENTS: Omit<ScheduleEventItem, 'id' | 'updatedAt'>[] = [
+  { title: 'Ở công ty (intern)', day: 'mon', startMinute: 10 * 60, endMinute: 17 * 60, color: '#61dafb', note: 'React task + học từ codebase.' },
+  { title: 'Backend thực hành', day: 'mon', startMinute: 19 * 60, endMinute: 20 * 60 + 30, color: '#f89820', note: 'Lý thuyết 30p + code 60p.' },
+  { title: 'LeetCode', day: 'mon', startMinute: 20 * 60 + 30, endMinute: 21 * 60 + 15, color: '#ff6b35', note: '1 bài/ngày.' },
+  { title: 'Intern + học tại công ty', day: 'tue', startMinute: 10 * 60, endMinute: 17 * 60, color: '#61dafb', note: '' },
+  { title: 'Backend API', day: 'wed', startMinute: 19 * 60, endMinute: 20 * 60 + 30, color: '#f89820', note: 'Test Postman sau mỗi API.' },
+  { title: 'React side project', day: 'thu', startMinute: 21 * 60 + 15, endMinute: 22 * 60 + 30, color: '#61dafb', note: 'Build feature thực chiến.' },
+  { title: 'IELTS', day: 'fri', startMinute: 21 * 60 + 15, endMinute: 21 * 60 + 45, color: '#c084fc', note: 'Listening + shadowing.' },
+  { title: 'Deep work project', day: 'sat', startMinute: 8 * 60, endMinute: 12 * 60, color: '#34d399', note: 'Build từ BE -> FE -> test.' },
+  { title: 'Docker', day: 'sat', startMinute: 14 * 60, endMinute: 15 * 60, color: '#2496ed', note: 'Dockerfile / Compose.' },
+  { title: 'Review tuần + IELTS', day: 'sun', startMinute: 9 * 60, endMinute: 11 * 60, color: '#c084fc', note: 'Ôn tập, không học mới.' },
+];
+
 const ALL_STEPS = PHASES.flatMap((phase) => phase.tracks.flatMap((track) => track.steps));
 
 const makeDefaultDraft = (): TaskDraft => ({
@@ -35,6 +98,15 @@ const makeDefaultDraft = (): TaskDraft => ({
   note: '',
   studyMinutes: '60',
   priority: 'medium',
+});
+
+const makeDefaultScheduleDraft = (): ScheduleDraft => ({
+  title: '',
+  day: 'mon',
+  start: '19:00',
+  end: '20:30',
+  color: SCHEDULE_COLORS[0].value,
+  note: '',
 });
 
 const createId = (): string => {
@@ -46,6 +118,65 @@ const createId = (): string => {
 };
 
 const normalizeMinutes = (rawMinutes: string | number): number => Math.max(0, Number(rawMinutes) || 0);
+
+const parseClockTime = (value: string): number | null => {
+  const normalized = value.trim();
+  const matches = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (!matches) {
+    return null;
+  }
+
+  const hours = Number(matches[1]);
+  const minutes = Number(matches[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+    return null;
+  }
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+};
+
+const formatClockTime = (minutes: number): string => {
+  const safeMinutes = Math.max(0, minutes);
+  const hours = Math.floor(safeMinutes / 60);
+  const mins = safeMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
+
+const sortScheduleItems = (items: ScheduleEventItem[]): ScheduleEventItem[] => {
+  return [...items].sort((a, b) => {
+    const dayDelta = DAY_ORDER[a.day] - DAY_ORDER[b.day];
+    if (dayDelta !== 0) {
+      return dayDelta;
+    }
+
+    if (a.startMinute !== b.startMinute) {
+      return a.startMinute - b.startMinute;
+    }
+
+    if (a.endMinute !== b.endMinute) {
+      return a.endMinute - b.endMinute;
+    }
+
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+};
+
+const withAlpha = (hexColor: string, alphaHex: string): string => {
+  if (/^#[\da-fA-F]{6}$/.test(hexColor)) {
+    return `${hexColor}${alphaHex}`;
+  }
+
+  return '#1a2430';
+};
+
+const clampScheduleStart = (startMinute: number, durationMinute: number): number => {
+  const maxStart = CALENDAR_END_MINUTE - durationMinute;
+  return Math.max(CALENDAR_START_MINUTE, Math.min(startMinute, Math.max(CALENDAR_START_MINUTE, maxStart)));
+};
 
 const sortTaskLikeItems = <T extends Pick<TaskItem, 'done' | 'priority' | 'updatedAt'>>(items: T[]): T[] => {
   return [...items].sort((a, b) => {
@@ -94,81 +225,10 @@ const formatStamp = (value: string): string =>
     minute: '2-digit',
   });
 
-interface PhaseStepItemProps {
-  step: Step;
-  isDone: boolean;
-  noteValue: string;
-  onToggle: () => void;
-  onNoteChange: (note: string) => void;
-}
-
-function PhaseStepItem({ step, isDone, noteValue, onToggle, onNoteChange }: PhaseStepItemProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [showNote, setShowNote] = useState(Boolean(noteValue.trim()));
-
-  useEffect(() => {
-    if (noteValue.trim() && !showNote) {
-      setShowNote(true);
-    }
-  }, [noteValue, showNote]);
-
-  return (
-    <article className={`phase-step-item ${isDone ? 'done' : ''} ${expanded ? 'expanded' : ''}`}>
-      <div className="phase-step-head">
-        <label className="phase-step-main">
-          <input type="checkbox" checked={isDone} onChange={onToggle} />
-          <span>{step.title}</span>
-        </label>
-
-        <div className="phase-step-actions">
-          <button
-            type="button"
-            className={`mini-icon-btn ${showNote || noteValue.trim() ? 'active' : ''}`}
-            onClick={() => setShowNote((prev) => !prev)}
-            aria-label="Bật/tắt ghi chú"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6.5 8.5h11M6.5 12h11M6.5 15.5h7" />
-            </svg>
-          </button>
-
-          <button
-            type="button"
-            className={`mini-icon-btn ${expanded ? 'active' : ''}`}
-            onClick={() => setExpanded((prev) => !prev)}
-            aria-label="Mở rộng nội dung"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" className={expanded ? 'rotated' : ''}>
-              <path d="M7 10l5 5 5-5" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {(expanded || showNote) && (
-        <div className="phase-step-body">
-          {expanded && <p className="phase-step-detail">{step.detail}</p>}
-
-          {showNote && (
-            <label className="phase-step-note">
-              <span>GHI CHU</span>
-              <textarea
-                rows={4}
-                value={noteValue}
-                onChange={(event) => onNoteChange(event.target.value)}
-                placeholder="Ghi insight, link tài liệu, câu hỏi cần hỏi senior..."
-              />
-            </label>
-          )}
-        </div>
-      )}
-    </article>
-  );
-}
-
 function App() {
   const [activeSection, setActiveSection] = useState<NavSection>('overview');
   const [notesPhaseId, setNotesPhaseId] = useState<PhaseId>('p1');
+  const [isDashboardOpen, setIsDashboardOpen] = useState<boolean>(true);
 
   const [doneSet, setDoneSet] = useState<Set<string>>(() => {
     try {
@@ -226,6 +286,29 @@ function App() {
     p2: makeDefaultDraft(),
     p3: makeDefaultDraft(),
   });
+  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEventItem[]>(() => {
+    try {
+      const raw = localStorage.getItem(SCHEDULE_STORAGE_KEY);
+      if (raw) {
+        return sortScheduleItems(JSON.parse(raw) as ScheduleEventItem[]);
+      }
+    } catch {
+      // Fallback to default schedule when local data is invalid.
+    }
+
+    const now = new Date().toISOString();
+    return sortScheduleItems(
+      DEFAULT_SCHEDULE_EVENTS.map((item) => ({
+        ...item,
+        id: createId(),
+        updatedAt: now,
+      })),
+    );
+  });
+  const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft>(makeDefaultScheduleDraft);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string>('');
+  const [draggingScheduleId, setDraggingScheduleId] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem(ROADMAP_STORAGE_KEY, JSON.stringify([...doneSet]));
@@ -246,6 +329,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(GENERAL_NOTE_STORAGE_KEY, generalNote);
   }, [generalNote]);
+
+  useEffect(() => {
+    localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(scheduleEvents));
+  }, [scheduleEvents]);
 
   const toggleStep = (stepId: string): void => {
     setDoneSet((prev) => {
@@ -387,6 +474,223 @@ function App() {
     }));
   };
 
+  const scheduleEventsByDay = useMemo(() => {
+    const base: Record<ScheduleDayId, ScheduleEventItem[]> = {
+      mon: [],
+      tue: [],
+      wed: [],
+      thu: [],
+      fri: [],
+      sat: [],
+      sun: [],
+    };
+
+    scheduleEvents.forEach((item) => {
+      base[item.day].push(item);
+    });
+
+    Object.keys(base).forEach((dayKey) => {
+      const dayId = dayKey as ScheduleDayId;
+      base[dayId].sort((a, b) => a.startMinute - b.startMinute);
+    });
+
+    return base;
+  }, [scheduleEvents]);
+
+  const resetScheduleDraft = (): void => {
+    setScheduleDraft(makeDefaultScheduleDraft());
+    setEditingScheduleId(null);
+    setScheduleError('');
+  };
+
+  const readScheduleRange = (draftItem: ScheduleDraft): { startMinute: number; endMinute: number } | null => {
+    const startMinute = parseClockTime(draftItem.start);
+    const endMinute = parseClockTime(draftItem.end);
+
+    if (startMinute === null || endMinute === null) {
+      setScheduleError('Giờ không hợp lệ. Dùng định dạng HH:MM, ví dụ 19:30.');
+      return null;
+    }
+
+    if (endMinute <= startMinute) {
+      setScheduleError('Giờ kết thúc phải lớn hơn giờ bắt đầu.');
+      return null;
+    }
+
+    if (startMinute < CALENDAR_START_MINUTE || endMinute > CALENDAR_END_MINUTE) {
+      setScheduleError(
+        `Lịch đang hiển thị khung ${formatClockTime(CALENDAR_START_MINUTE)}-${formatClockTime(CALENDAR_END_MINUTE)}.`,
+      );
+      return null;
+    }
+
+    return { startMinute, endMinute };
+  };
+
+  const handleScheduleSubmit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (!scheduleDraft.title.trim()) {
+      setScheduleError('Bạn cần nhập tên lịch học.');
+      return;
+    }
+
+    const range = readScheduleRange(scheduleDraft);
+    if (!range) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const payload = {
+      title: scheduleDraft.title.trim(),
+      day: scheduleDraft.day,
+      startMinute: range.startMinute,
+      endMinute: range.endMinute,
+      color: scheduleDraft.color,
+      note: scheduleDraft.note.trim(),
+      updatedAt: now,
+    };
+
+    if (editingScheduleId) {
+      setScheduleEvents((prev) =>
+        sortScheduleItems(
+          prev.map((item) =>
+            item.id === editingScheduleId
+              ? {
+                ...item,
+                ...payload,
+              }
+              : item,
+          ),
+        ),
+      );
+    } else {
+      setScheduleEvents((prev) =>
+        sortScheduleItems([
+          ...prev,
+          {
+            id: createId(),
+            ...payload,
+          },
+        ]),
+      );
+    }
+
+    resetScheduleDraft();
+  };
+
+  const deleteScheduleEvent = (scheduleId: string): void => {
+    setScheduleEvents((prev) => prev.filter((item) => item.id !== scheduleId));
+    if (editingScheduleId === scheduleId) {
+      resetScheduleDraft();
+    }
+  };
+
+  const editScheduleEvent = (scheduleItem: ScheduleEventItem): void => {
+    setEditingScheduleId(scheduleItem.id);
+    setScheduleDraft({
+      title: scheduleItem.title,
+      day: scheduleItem.day,
+      start: formatClockTime(scheduleItem.startMinute),
+      end: formatClockTime(scheduleItem.endMinute),
+      color: scheduleItem.color,
+      note: scheduleItem.note,
+    });
+    setScheduleError('');
+  };
+
+  const nudgeScheduleEvent = (scheduleId: string, deltaMinutes: number): void => {
+    setScheduleEvents((prev) =>
+      sortScheduleItems(
+        prev.map((item) => {
+          if (item.id !== scheduleId) {
+            return item;
+          }
+
+          const duration = item.endMinute - item.startMinute;
+          const nextStart = clampScheduleStart(item.startMinute + deltaMinutes, duration);
+          return {
+            ...item,
+            startMinute: nextStart,
+            endMinute: nextStart + duration,
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      ),
+    );
+  };
+
+  const handleScheduleDragStart = (
+    dragEvent: DragEvent<HTMLElement>,
+    scheduleId: string,
+  ): void => {
+    dragEvent.dataTransfer.setData('text/schedule-event-id', scheduleId);
+    dragEvent.dataTransfer.setData('text/plain', scheduleId);
+    dragEvent.dataTransfer.effectAllowed = 'move';
+    setDraggingScheduleId(scheduleId);
+  };
+
+  const handleScheduleDragOver = (dragEvent: DragEvent<HTMLDivElement>): void => {
+    dragEvent.preventDefault();
+    dragEvent.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleScheduleDrop = (dragEvent: DragEvent<HTMLDivElement>, dayId: ScheduleDayId): void => {
+    dragEvent.preventDefault();
+    const scheduleId =
+      dragEvent.dataTransfer.getData('text/schedule-event-id') || dragEvent.dataTransfer.getData('text/plain');
+    if (!scheduleId) {
+      setDraggingScheduleId(null);
+      return;
+    }
+
+    const selectedItem = scheduleEvents.find((item) => item.id === scheduleId);
+    if (!selectedItem) {
+      setDraggingScheduleId(null);
+      return;
+    }
+
+    const columnRect = dragEvent.currentTarget.getBoundingClientRect();
+    const relativeY = Math.min(Math.max(dragEvent.clientY - columnRect.top, 0), columnRect.height);
+    const targetSlotIndex = Math.min(
+      CALENDAR_SLOT_COUNT - 1,
+      Math.max(0, Math.floor((relativeY / columnRect.height) * CALENDAR_SLOT_COUNT)),
+    );
+    const rawStartMinute = CALENDAR_START_MINUTE + targetSlotIndex * CALENDAR_SLOT_MINUTES;
+    const duration = selectedItem.endMinute - selectedItem.startMinute;
+    const nextStart = clampScheduleStart(rawStartMinute, duration);
+
+    setScheduleEvents((prev) =>
+      sortScheduleItems(
+        prev.map((item) =>
+          item.id === scheduleId
+            ? {
+              ...item,
+              day: dayId,
+              startMinute: nextStart,
+              endMinute: nextStart + duration,
+              updatedAt: new Date().toISOString(),
+            }
+            : item,
+        ),
+      ),
+    );
+    setDraggingScheduleId(null);
+  };
+
+  const getScheduleEventStyle = (item: ScheduleEventItem): CSSProperties => {
+    const totalMinutes = CALENDAR_END_MINUTE - CALENDAR_START_MINUTE;
+    const topPercent = ((item.startMinute - CALENDAR_START_MINUTE) / totalMinutes) * 100;
+    const heightPercent = ((item.endMinute - item.startMinute) / totalMinutes) * 100;
+
+    return {
+      top: `${topPercent}%`,
+      height: `${Math.max(heightPercent, 4)}%`,
+      borderColor: item.color,
+      background: `linear-gradient(155deg, ${withAlpha(item.color, '4a')} 0%, ${withAlpha(item.color, '26')} 100%)`,
+      boxShadow: `0 10px 24px ${withAlpha(item.color, '2e')}`,
+    };
+  };
+
   const phaseProgress = (phase: Phase): { done: number; total: number; percent: number } => {
     const phaseSteps = phase.tracks.flatMap((track) => track.steps);
     const staticDone = phaseSteps.filter((step) => doneSet.has(step.id)).length;
@@ -436,585 +740,125 @@ function App() {
     return [...phaseTaskNoteItems, ...stepNoteItems];
   }, [notesPhaseId, phaseTasksByPhase, stepNotes]);
 
-  const sections: { id: NavSection; label: string }[] = [
+  const topNavSections: NavItem[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'p1', label: 'Phase 1' },
     { id: 'p2', label: 'Phase 2' },
     { id: 'p3', label: 'Phase 3' },
+  ];
+
+  const dashboardSections: NavItem[] = [
     { id: 'schedule', label: 'Lịch học' },
     { id: 'tasks', label: 'Task List' },
     { id: 'notes', label: 'Notes' },
   ];
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand">DAT DEV MAP</div>
-        <nav className="topnav">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              className={`nav-btn ${activeSection === section.id ? 'active' : ''}`}
-              onClick={() => setActiveSection(section.id)}
-            >
-              {section.label}
-            </button>
-          ))}
-        </nav>
-        <div className="progress-chip">
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${roadmapProgress}%` }} />
-          </div>
-          <span>{roadmapProgress}%</span>
-        </div>
-      </header>
+    <AppLayout
+      header={
+        <AppHeader
+          sections={topNavSections}
+          activeSection={activeSection}
+          onNavigate={setActiveSection}
+          roadmapProgress={roadmapProgress}
+          isDashboardOpen={isDashboardOpen}
+          onToggleDashboard={() => setIsDashboardOpen((prev) => !prev)}
+        />
+      }
+      sidebar={
+        <LeftDashboard
+          sections={dashboardSections}
+          activeSection={activeSection}
+          onNavigate={setActiveSection}
+          isOpen={isDashboardOpen}
+        />
+      }
+      footer={<AppFooter />}
+    >
+      {activeSection === 'overview' && (
+        <OverviewPage
+          phaseTaskCount={phaseTasks.length}
+          openTasksTotal={openTasksTotal}
+          totalStudyMinutes={totalStudyMinutes}
+          totalNotesCount={totalNotesCount}
+          onOpenPhase={(phaseId) => setActiveSection(phaseId)}
+          phaseProgress={phaseProgress}
+          totalStepsCount={ALL_STEPS.length}
+        />
+      )}
 
-      <main className="content">
-        {activeSection === 'overview' && (
-          <section className="section fade-in">
-            <div className="hero">
-              <p className="kicker">Lộ trình học + theo dõi task thực chiến</p>
-              <h1>
-                React + Vite + TSX
-                <br />
-                <span>Roadmap 3 tháng có theo dõi tiến độ thật.</span>
-              </h1>
-              <p className="hero-copy">
-                Đánh dấu roadmap, thêm task trong từng phase, ghi chú theo từng bước và gom toàn bộ ghi chú ở tab
-                Notes để ôn lại nhanh.
-              </p>
-            </div>
+      {(activeSection === 'p1' || activeSection === 'p2' || activeSection === 'p3') && (
+        <PhasePage
+          activePhaseId={activeSection}
+          doneSet={doneSet}
+          stepNotes={stepNotes}
+          phaseTasksByPhase={phaseTasksByPhase}
+          phaseDrafts={phaseDrafts}
+          phaseProgress={phaseProgress}
+          onToggleStep={toggleStep}
+          onStepNoteChange={updateStepNote}
+          onAddPhaseTask={handleAddPhaseTask}
+          onUpdatePhaseDraft={updatePhaseDraft}
+          onUpdatePhaseTask={upsertPhaseTask}
+          onDeletePhaseTask={deletePhaseTask}
+          normalizeMinutes={normalizeMinutes}
+          formatStamp={formatStamp}
+        />
+      )}
 
-            <div className="stats-grid">
-              <article className="stat-card">
-                <strong>{PHASES.length}</strong>
-                <p>Phases</p>
-              </article>
-              <article className="stat-card">
-                <strong>{ALL_STEPS.length}</strong>
-                <p>Bước roadmap</p>
-              </article>
-              <article className="stat-card">
-                <strong>{phaseTasks.length}</strong>
-                <p>Task trong phase</p>
-              </article>
-              <article className="stat-card">
-                <strong>{openTasksTotal}</strong>
-                <p>Tổng task mở</p>
-              </article>
-              <article className="stat-card">
-                <strong>{(totalStudyMinutes / 60).toFixed(1)}h</strong>
-                <p>Tổng giờ học</p>
-              </article>
-              <article className="stat-card">
-                <strong>{totalNotesCount}</strong>
-                <p>Tổng ghi chú</p>
-              </article>
-            </div>
+      {activeSection === 'schedule' && (
+        <SchedulePage
+          editingScheduleId={editingScheduleId}
+          scheduleDraft={scheduleDraft}
+          scheduleError={scheduleError}
+          draggingScheduleId={draggingScheduleId}
+          weekDays={WEEK_DAYS}
+          scheduleColors={SCHEDULE_COLORS}
+          calendarSlotMinutes={CALENDAR_SLOT_MINUTES}
+          calendarStartMinute={CALENDAR_START_MINUTE}
+          calendarEndMinute={CALENDAR_END_MINUTE}
+          calendarSlotCount={CALENDAR_SLOT_COUNT}
+          calendarHourMarkers={CALENDAR_HOUR_MARKERS}
+          scheduleEventsByDay={scheduleEventsByDay}
+          onSubmit={handleScheduleSubmit}
+          onDraftChange={(patch) => setScheduleDraft((prev) => ({ ...prev, ...patch }))}
+          onResetDraft={resetScheduleDraft}
+          onDragOver={handleScheduleDragOver}
+          onDrop={handleScheduleDrop}
+          onDragStart={handleScheduleDragStart}
+          onDragEnd={() => setDraggingScheduleId(null)}
+          onNudgeEvent={nudgeScheduleEvent}
+          onEditEvent={editScheduleEvent}
+          onDeleteEvent={deleteScheduleEvent}
+          getScheduleEventStyle={getScheduleEventStyle}
+          formatClockTime={formatClockTime}
+        />
+      )}
 
-            <div className="phase-grid">
-              {PHASES.map((phase) => {
-                const progress = phaseProgress(phase);
-                return (
-                  <button
-                    key={phase.id}
-                    className="phase-card"
-                    type="button"
-                    onClick={() => setActiveSection(phase.id)}
-                    style={{ '--phase-color': phase.color } as CSSProperties}
-                  >
-                    <p className="phase-week">{phase.sublabel}</p>
-                    <h3>{phase.label}</h3>
-                    <p className="phase-desc">{phase.desc}</p>
-                    <p className="phase-goal">{phase.goal}</p>
-                    <div className="phase-progress">
-                      <div className="phase-progress-track">
-                        <div className="phase-progress-fill" style={{ width: `${progress.percent}%` }} />
-                      </div>
-                      <span>
-                        {progress.done}/{progress.total}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+      {activeSection === 'tasks' && (
+        <TasksPage
+          draft={draft}
+          tasks={sortedTasks}
+          onSubmit={handleAddTask}
+          onDraftChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+          onUpsertTask={upsertTask}
+          onDeleteTask={deleteTask}
+          normalizeMinutes={normalizeMinutes}
+          formatStamp={formatStamp}
+        />
+      )}
 
-            <div className="rule-grid">
-              {RULES.map((rule) => (
-                <article key={rule.title} className="rule-card">
-                  <span>{rule.emoji}</span>
-                  <div>
-                    <h4>{rule.title}</h4>
-                    <p>{rule.desc}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {(activeSection === 'p1' || activeSection === 'p2' || activeSection === 'p3') && (
-          <section className="section fade-in">
-            {PHASES.filter((phase) => phase.id === activeSection).map((phase) => {
-              const progress = phaseProgress(phase);
-              const phaseTaskList = phaseTasksByPhase[phase.id];
-              const currentDraft = phaseDrafts[phase.id];
-
-              return (
-                <div key={phase.id}>
-                  <div className="phase-header">
-                    <div>
-                      <p className="kicker" style={{ color: phase.color }}>
-                        {phase.sublabel}
-                      </p>
-                      <h2>
-                        {phase.label} - {phase.desc}
-                      </h2>
-                      <p className="hero-copy">{phase.goal}</p>
-                    </div>
-                    <div className="phase-summary" style={{ color: phase.color }}>
-                      <strong>{progress.percent}%</strong>
-                      <span>
-                        {progress.done}/{progress.total}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="track-grid">
-                    {phase.tracks.map((track) => {
-                      const meta = TRACKS[track.track];
-                      const doneCount = track.steps.filter((step) => doneSet.has(step.id)).length;
-
-                      return (
-                        <article key={track.track} className="track-card">
-                          <header>
-                            <h3 style={{ color: meta.color }}>{meta.label}</h3>
-                            <span>
-                              {doneCount}/{track.steps.length}
-                            </span>
-                          </header>
-                          <div className="track-steps">
-                            {track.steps.map((step) => {
-                              const isDone = doneSet.has(step.id);
-                              const noteValue = stepNotes[step.id] ?? '';
-
-                              return (
-                                <PhaseStepItem
-                                  key={step.id}
-                                  step={step}
-                                  isDone={isDone}
-                                  noteValue={noteValue}
-                                  onToggle={() => toggleStep(step.id)}
-                                  onNoteChange={(note) => updateStepNote(step.id, note)}
-                                />
-                              );
-                            })}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-
-                  <section className="phase-extra">
-                    <h3 className="phase-extra-title">Thêm task trong {phase.label}</h3>
-
-                    <form className="task-form" onSubmit={(event) => handleAddPhaseTask(event, phase.id)}>
-                      <label>
-                        Tên task phase
-                        <input
-                          type="text"
-                          placeholder={`Ví dụ: Hoàn thành mini feature cho ${phase.label}`}
-                          value={currentDraft.title}
-                          onChange={(event) => updatePhaseDraft(phase.id, { title: event.target.value })}
-                          required
-                        />
-                      </label>
-
-                      <label>
-                        Note task phase
-                        <textarea
-                          rows={3}
-                          value={currentDraft.note}
-                          onChange={(event) => updatePhaseDraft(phase.id, { note: event.target.value })}
-                          placeholder="Ghi chú mục tiêu, blocker, link tài liệu..."
-                        />
-                      </label>
-
-                      <div className="task-form-row">
-                        <label>
-                          Thời gian học (phút)
-                          <input
-                            type="number"
-                            min={0}
-                            step={15}
-                            value={currentDraft.studyMinutes}
-                            onChange={(event) =>
-                              updatePhaseDraft(phase.id, { studyMinutes: event.target.value })
-                            }
-                          />
-                        </label>
-
-                        <label>
-                          Ưu tiên
-                          <select
-                            value={currentDraft.priority}
-                            onChange={(event) =>
-                              updatePhaseDraft(phase.id, { priority: event.target.value as TaskPriority })
-                            }
-                          >
-                            {Object.entries(PRIORITY_META).map(([value, meta]) => (
-                              <option key={value} value={value}>
-                                {meta.label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-
-                      <button className="primary-btn" type="submit">
-                        + Thêm task cho phase
-                      </button>
-                    </form>
-
-                    <div className="task-meta">
-                      <span>{phaseTaskList.length} task phase</span>
-                      <span>{phaseTaskList.filter((task) => !task.done).length} chưa xong</span>
-                      <span>
-                        {phaseTaskList.reduce((sum, task) => sum + task.studyMinutes, 0)} phút dự kiến
-                      </span>
-                    </div>
-
-                    <div className="task-list">
-                      {phaseTaskList.length === 0 && (
-                        <p className="empty">Phase này chưa có task riêng. Bạn có thể thêm ngay ở form phía trên.</p>
-                      )}
-
-                      {phaseTaskList.map((task) => (
-                        <article key={task.id} className={`task-card ${task.done ? 'done' : ''}`}>
-                          <header>
-                            <label className="task-check">
-                              <input
-                                type="checkbox"
-                                checked={task.done}
-                                onChange={(event) =>
-                                  upsertPhaseTask(task.id, { done: event.target.checked })
-                                }
-                              />
-                              <input
-                                className="task-title-input"
-                                value={task.title}
-                                onChange={(event) =>
-                                  upsertPhaseTask(task.id, { title: event.target.value })
-                                }
-                              />
-                            </label>
-
-                            <button
-                              type="button"
-                              className="ghost-btn"
-                              onClick={() => deletePhaseTask(task.id)}
-                            >
-                              Xóa
-                            </button>
-                          </header>
-
-                          <div className="task-controls">
-                            <label>
-                              Ưu tiên
-                              <select
-                                value={task.priority}
-                                onChange={(event) =>
-                                  upsertPhaseTask(task.id, { priority: event.target.value as TaskPriority })
-                                }
-                                style={{ borderColor: PRIORITY_META[task.priority].color }}
-                              >
-                                {Object.entries(PRIORITY_META).map(([value, meta]) => (
-                                  <option key={value} value={value}>
-                                    {meta.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <label>
-                              Thời gian học (phút)
-                              <input
-                                type="number"
-                                min={0}
-                                step={15}
-                                value={task.studyMinutes}
-                                onChange={(event) =>
-                                  upsertPhaseTask(task.id, {
-                                    studyMinutes: normalizeMinutes(event.target.value),
-                                  })
-                                }
-                              />
-                            </label>
-                          </div>
-
-                          <label>
-                            Note
-                            <textarea
-                              rows={3}
-                              value={task.note}
-                              onChange={(event) => upsertPhaseTask(task.id, { note: event.target.value })}
-                              placeholder="Ghi chú cho task phase..."
-                            />
-                          </label>
-
-                          <footer>
-                            <span style={{ color: PRIORITY_META[task.priority].color }}>
-                              {PRIORITY_META[task.priority].label}
-                            </span>
-                            <span>Cập nhật: {formatStamp(task.updatedAt)}</span>
-                          </footer>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                </div>
-              );
-            })}
-          </section>
-        )}
-
-        {activeSection === 'schedule' && (
-          <section className="section fade-in">
-            <p className="kicker">Lịch học cố định</p>
-            <h2>Lịch hàng ngày</h2>
-            <div className="schedule-grid">
-              {SCHEDULE.map((day) => (
-                <article key={day.day} className="schedule-card" style={{ '--day-color': day.color } as CSSProperties}>
-                  <h3>{day.day}</h3>
-                  {day.slots.map((slot) => (
-                    <div key={`${day.day}-${slot.time}-${slot.label}`} className="slot-row">
-                      <p className="slot-time" style={{ color: slot.color }}>
-                        {slot.time}
-                      </p>
-                      <div>
-                        <strong>{slot.label}</strong>
-                        <p>{slot.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeSection === 'tasks' && (
-          <section className="section fade-in">
-            <p className="kicker">Task Manager</p>
-            <h2>Thêm và quản lý task học tập</h2>
-
-            <form className="task-form" onSubmit={handleAddTask}>
-              <label>
-                Tên task
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Hoàn thành API login"
-                  value={draft.title}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                  required
-                />
-              </label>
-
-              <label>
-                Note
-                <textarea
-                  placeholder="Ghi chú nhanh, link tài liệu, blockers..."
-                  value={draft.note}
-                  onChange={(event) => setDraft((prev) => ({ ...prev, note: event.target.value }))}
-                  rows={3}
-                />
-              </label>
-
-              <div className="task-form-row">
-                <label>
-                  Thời gian học (phút)
-                  <input
-                    type="number"
-                    min={0}
-                    step={15}
-                    value={draft.studyMinutes}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, studyMinutes: event.target.value }))}
-                  />
-                </label>
-
-                <label>
-                  Ưu tiên
-                  <select
-                    value={draft.priority}
-                    onChange={(event) =>
-                      setDraft((prev) => ({ ...prev, priority: event.target.value as TaskPriority }))
-                    }
-                  >
-                    {Object.entries(PRIORITY_META).map(([value, meta]) => (
-                      <option key={value} value={value}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <button className="primary-btn" type="submit">
-                + Thêm task
-              </button>
-            </form>
-
-            <div className="task-meta">
-              <span>{tasks.length} task</span>
-              <span>{tasks.filter((task) => !task.done).length} chưa xong</span>
-              <span>{tasks.reduce((sum, task) => sum + task.studyMinutes, 0)} phút dự kiến</span>
-            </div>
-
-            <div className="task-list">
-              {sortedTasks.length === 0 && <p className="empty">Chưa có task nào. Thêm task đầu tiên để bắt đầu.</p>}
-
-              {sortedTasks.map((task) => (
-                <article key={task.id} className={`task-card ${task.done ? 'done' : ''}`}>
-                  <header>
-                    <label className="task-check">
-                      <input
-                        type="checkbox"
-                        checked={task.done}
-                        onChange={(event) => upsertTask(task.id, { done: event.target.checked })}
-                      />
-                      <input
-                        className="task-title-input"
-                        value={task.title}
-                        onChange={(event) => upsertTask(task.id, { title: event.target.value })}
-                      />
-                    </label>
-
-                    <button type="button" className="ghost-btn" onClick={() => deleteTask(task.id)}>
-                      Xóa
-                    </button>
-                  </header>
-
-                  <div className="task-controls">
-                    <label>
-                      Ưu tiên
-                      <select
-                        value={task.priority}
-                        onChange={(event) => upsertTask(task.id, { priority: event.target.value as TaskPriority })}
-                        style={{ borderColor: PRIORITY_META[task.priority].color }}
-                      >
-                        {Object.entries(PRIORITY_META).map(([value, meta]) => (
-                          <option key={value} value={value}>
-                            {meta.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label>
-                      Thời gian học (phút)
-                      <input
-                        type="number"
-                        min={0}
-                        step={15}
-                        value={task.studyMinutes}
-                        onChange={(event) =>
-                          upsertTask(task.id, {
-                            studyMinutes: normalizeMinutes(event.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  <label>
-                    Note
-                    <textarea
-                      rows={3}
-                      value={task.note}
-                      onChange={(event) => upsertTask(task.id, { note: event.target.value })}
-                      placeholder="Ghi chú cho task này..."
-                    />
-                  </label>
-
-                  <footer>
-                    <span style={{ color: PRIORITY_META[task.priority].color }}>
-                      {PRIORITY_META[task.priority].label}
-                    </span>
-                    <span>Cập nhật: {formatStamp(task.updatedAt)}</span>
-                  </footer>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {activeSection === 'notes' && (
-          <section className="section fade-in">
-            <p className="kicker">Notes Hub</p>
-            <h2>Tổng hợp ghi chú theo phase</h2>
-
-            <div className="notes-layout">
-              <article className="notes-panel">
-                <label className="notes-select">
-                  Chọn phase để xem tất cả ghi chú
-                  <select
-                    value={notesPhaseId}
-                    onChange={(event) => setNotesPhaseId(event.target.value as PhaseId)}
-                  >
-                    {PHASES.map((phase) => (
-                      <option key={phase.id} value={phase.id}>
-                        {phase.label} - {phase.sublabel}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <p className="notes-helper">{phaseNotes.length} ghi chú trong phase đang chọn.</p>
-
-                <div className="notes-list">
-                  {phaseNotes.length === 0 && (
-                    <p className="empty">Phase này chưa có ghi chú. Hãy thêm note tại bước học hoặc task phase.</p>
-                  )}
-
-                  {phaseNotes.map((item) => (
-                    <article key={item.id} className="note-item">
-                      <header>
-                        <strong>{item.title}</strong>
-                        <span className={`note-tag ${item.source}`}>
-                          {item.source === 'phase-task' ? 'Task phase' : 'Step note'}
-                        </span>
-                      </header>
-                      <p>{item.note}</p>
-                      <footer>
-                        <span>{item.detail}</span>
-                        {item.updatedAt && <span>{formatStamp(item.updatedAt)}</span>}
-                      </footer>
-                    </article>
-                  ))}
-                </div>
-              </article>
-
-              <article className="notes-panel">
-                <h3>Ghi chú chung</h3>
-                <p className="notes-helper">Nơi ghi mục tiêu tuần, blockers tổng, plan ôn tập chung.</p>
-                <textarea
-                  className="general-note"
-                  rows={16}
-                  value={generalNote}
-                  onChange={(event) => setGeneralNote(event.target.value)}
-                  placeholder="Ví dụ: Tuần này tập trung hoàn tất auth flow + 5 bài LeetCode..."
-                />
-                <p className="notes-helper">
-                  {generalNote.trim() ? 'Đã lưu tự động vào localStorage.' : 'Chưa có ghi chú chung.'}
-                </p>
-              </article>
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
+      {activeSection === 'notes' && (
+        <NotesPage
+          notesPhaseId={notesPhaseId}
+          phaseNotes={phaseNotes}
+          generalNote={generalNote}
+          onPhaseChange={(phaseId) => setNotesPhaseId(phaseId)}
+          onGeneralNoteChange={(note) => setGeneralNote(note)}
+          formatStamp={formatStamp}
+        />
+      )}
+    </AppLayout>
   );
 }
 

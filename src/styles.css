@@ -33,6 +33,30 @@ body {
   min-height: 100vh;
 }
 
+.app-footer {
+  border-top: 1px solid var(--line);
+  background: rgba(10, 14, 19, 0.94);
+  padding: 0.8rem 1.1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.app-footer p {
+  margin: 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  color: var(--highlight);
+}
+
+.app-footer span {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -47,12 +71,89 @@ body {
   backdrop-filter: blur(12px);
 }
 
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .brand {
   font-family: 'Space Mono', monospace;
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   color: var(--highlight);
+}
+
+.dashboard-toggle-btn {
+  border: 1px solid #2c3440;
+  background: #121923;
+  color: var(--text);
+  border-radius: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: calc(100vh - 74px);
+}
+
+.left-dashboard {
+  width: 230px;
+  padding: 1rem 0.75rem;
+  border-right: 1px solid var(--line);
+  background: rgba(11, 15, 20, 0.75);
+  backdrop-filter: blur(4px);
+  transition: width 0.24s ease, opacity 0.24s ease, padding 0.24s ease;
+  overflow: hidden;
+}
+
+.left-dashboard.closed {
+  width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-right-color: transparent;
+  opacity: 0;
+}
+
+.dashboard-title {
+  margin: 0 0 0.8rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.dashboard-nav {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dashboard-link {
+  border: 1px solid #2e3744;
+  background: #121923;
+  color: var(--text-soft);
+  text-align: left;
+  border-radius: 10px;
+  padding: 0.62rem 0.72rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.dashboard-link.active {
+  border-color: var(--highlight);
+  color: #121212;
+  background: var(--highlight);
+  font-weight: 700;
 }
 
 .topnav {
@@ -509,44 +610,254 @@ body {
   font-size: 1.15rem;
 }
 
-.schedule-grid {
+.schedule-builder {
   margin-top: 1rem;
   display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+
+.schedule-form {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 1rem;
+  display: grid;
   gap: 0.75rem;
 }
 
-.schedule-card {
-  border: 1px solid var(--day-color);
-  border-radius: 12px;
-  background: rgba(22, 27, 34, 0.82);
-  padding: 0.95rem;
-}
-
-.schedule-card h3 {
-  margin: 0 0 0.4rem;
-}
-
-.slot-row {
-  padding: 0.55rem 0;
-  border-top: 1px solid #2a3442;
-}
-
-.slot-time {
+.schedule-form h3 {
   margin: 0;
-  font-family: 'Space Mono', monospace;
-  font-size: 0.72rem;
+  font-size: 1.02rem;
 }
 
-.slot-row strong {
-  font-size: 0.86rem;
-}
-
-.slot-row p {
-  margin: 0.22rem 0 0;
+.schedule-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.74rem;
   color: var(--text-soft);
+}
+
+.schedule-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.color-picker-field {
+  align-content: start;
+}
+
+.schedule-color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #344051;
+  border-radius: 9px;
+  background: #131923;
+}
+
+.schedule-color-swatch {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  border: 2px solid #2b3647;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(7, 10, 14, 0.75);
+}
+
+.schedule-color-swatch.active {
+  border-color: #f3f8ff;
+  box-shadow: 0 0 0 2px rgba(97, 218, 251, 0.34);
+}
+
+.schedule-form-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.schedule-error {
+  margin: 0;
+  border: 1px solid #854848;
+  background: #2a1717;
+  color: #ffb9b9;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.weekly-calendar-wrap {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(19, 25, 35, 0.9);
+  padding: 0.7rem;
+  overflow-x: auto;
+}
+
+.weekly-calendar-head,
+.weekly-calendar-grid {
+  min-width: 980px;
+  display: grid;
+  grid-template-columns: 72px repeat(7, minmax(128px, 1fr));
+  gap: 0.45rem;
+}
+
+.weekly-calendar-head {
+  margin-bottom: 0.45rem;
+}
+
+.calendar-time-head {
+  border: 1px solid #2d3746;
+  border-radius: 10px;
+  background: #121923;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+}
+
+.calendar-day-head {
+  border: 1px solid #2d3746;
+  border-radius: 10px;
+  background: #151d28;
+  padding: 0.5rem 0.45rem;
+  display: grid;
+  gap: 0.1rem;
+  text-align: center;
+}
+
+.calendar-day-head strong {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--highlight);
+  letter-spacing: 0.04em;
+}
+
+.calendar-day-head span {
   font-size: 0.8rem;
-  line-height: 1.45;
+}
+
+.calendar-time-col {
+  display: grid;
+  grid-template-rows: repeat(17, 48px);
+}
+
+.calendar-time-mark {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.67rem;
+  color: #91a2b7;
+  padding-top: 0.15rem;
+  text-align: right;
+  padding-right: 0.2rem;
+}
+
+.calendar-day-col {
+  position: relative;
+  height: 816px;
+  border: 1px solid #2d3746;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 22, 31, 0.86);
+}
+
+.calendar-day-col.droppable {
+  border-color: #3b495f;
+}
+
+.calendar-slot-line {
+  height: 24px;
+  border-top: 1px dashed rgba(102, 120, 146, 0.2);
+}
+
+.calendar-slot-line.hour {
+  border-top-style: solid;
+  border-top-color: rgba(117, 132, 156, 0.3);
+}
+
+.calendar-event {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: 10px;
+  padding: 0.42rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  cursor: grab;
+  z-index: 2;
+  min-height: 64px;
+  overflow: hidden;
+}
+
+.calendar-event.dragging {
+  opacity: 0.58;
+  cursor: grabbing;
+}
+
+.calendar-event header {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.calendar-event header strong {
+  font-size: 0.72rem;
+  line-height: 1.24;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.calendar-event header span {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.6rem;
+  color: #c9d7e8;
+}
+
+.calendar-event footer {
+  display: flex;
+  gap: 0.28rem;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.calendar-event-icon-btn {
+  width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border: 1px solid #3c4e67;
+  background: rgba(9, 14, 21, 0.68);
+  color: #e5f1fe;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.calendar-event-icon-btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.calendar-event-icon-btn svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.calendar-event-icon-btn.danger {
+  color: #ffb3be;
+  border-color: #7e4250;
 }
 
 .task-form {
@@ -795,8 +1106,7 @@ textarea {
     grid-template-columns: repeat(3, minmax(150px, 1fr));
   }
 
-  .phase-grid,
-  .schedule-grid {
+  .phase-grid {
     grid-template-columns: repeat(2, minmax(230px, 1fr));
   }
 
@@ -810,6 +1120,24 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .left-dashboard {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .left-dashboard.closed {
+    width: 100%;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+  }
+
   .progress-chip {
     justify-content: flex-start;
   }
@@ -818,9 +1146,12 @@ textarea {
   .phase-grid,
   .rule-grid,
   .track-grid,
-  .schedule-grid,
   .task-controls,
   .task-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-form-row {
     grid-template-columns: 1fr;
   }
 
