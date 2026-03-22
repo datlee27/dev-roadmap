@@ -4,14 +4,14 @@ import AppHeader from './components/layout/AppHeader';
 import LeftDashboard from './components/layout/LeftDashboard';
 import { NavItem, NavSection } from './@types/navigation';
 import { ScheduleDayId, ScheduleDraft, ScheduleEventItem, ScheduleTimelineItem, WeekDayItem } from './@types/schedule';
-import { PHASES, PRIORITY_META, TRACKS } from './data';
+import { DEFAULT_ROADMAP_CONFIG, PRIORITY_META } from './data';
 import AppLayout from './layouts/AppLayout';
 import NotesPage from './pages/NotesPage';
 import OverviewPage from './pages/OverviewPage';
 import PhasePage from './pages/PhasePage';
 import SchedulePage from './pages/SchedulePage';
 import TasksPage from './pages/TasksPage';
-import { Phase, PhaseId, PhaseTaskItem, TaskItem, TaskPriority } from './types';
+import { Phase, PhaseId, PhaseTaskItem, RoadmapConfig, TaskItem, TaskPriority, TrackMeta } from './types';
 
 const ROADMAP_STORAGE_KEY = 'dev-roadmap-v2-progress';
 const LEGACY_ROADMAP_STORAGE_KEY = 'dev-roadmap-v1';
@@ -21,6 +21,7 @@ const STEP_NOTE_STORAGE_KEY = 'dev-roadmap-v2-step-notes';
 const GENERAL_NOTE_STORAGE_KEY = 'dev-roadmap-v2-general-note';
 const SCHEDULE_STORAGE_KEY = 'dev-roadmap-v3-schedule';
 const SCHEDULE_TIMELINE_STORAGE_KEY = 'dev-roadmap-v3-schedule-timeline';
+const ROADMAP_CONFIG_STORAGE_KEY = 'dev-roadmap-v4-config';
 type StepNoteMap = Record<string, string>;
 
 interface TaskDraft {
@@ -92,7 +93,7 @@ const DEFAULT_SCHEDULE_EVENTS: Omit<ScheduleEventItem, 'id' | 'updatedAt'>[] = [
   { title: 'Review tuần + IELTS', day: 'sun', startMinute: 9 * 60, endMinute: 11 * 60, color: '#c084fc', note: 'Ôn tập, không học mới.' },
 ];
 
-const ALL_STEPS = PHASES.flatMap((phase) => phase.tracks.flatMap((track) => track.steps));
+const DEFAULT_TRACK_COLOR = '#61dafb';
 
 const makeDefaultDraft = (): TaskDraft => ({
   title: '',
@@ -170,6 +171,159 @@ const sortScheduleTimelineItems = (items: ScheduleTimelineItem[]): ScheduleTimel
   return [...items].sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const normalizeRoadmapConfig = (value: unknown): RoadmapConfig | null => {
+  if (!isRecord(value) || !Array.isArray(value.phases)) {
+    return null;
+  }
+
+  const rawTracks = isRecord(value.tracks) ? value.tracks : {};
+  const normalizedTracks: Record<string, TrackMeta> = {};
+  Object.entries(rawTracks).forEach(([trackKey, trackMeta]) => {
+    if (!isRecord(trackMeta)) {
+      return;
+    }
+
+    const label = typeof trackMeta.label === 'string' ? trackMeta.label.trim() : '';
+    const color = typeof trackMeta.color === 'string' ? trackMeta.color.trim() : '';
+    if (!label) {
+      return;
+    }
+
+    normalizedTracks[trackKey] = {
+      label,
+      color: color || DEFAULT_TRACK_COLOR,
+    };
+  });
+
+  const uniquePhaseIds = new Set<string>();
+  const normalizedPhases: Phase[] = value.phases
+    .map((phaseItem) => {
+      if (!isRecord(phaseItem)) {
+        return null;
+      }
+
+      const id = typeof phaseItem.id === 'string' ? phaseItem.id.trim() : '';
+      const label = typeof phaseItem.label === 'string' ? phaseItem.label.trim() : '';
+      const sublabel = typeof phaseItem.sublabel === 'string' ? phaseItem.sublabel.trim() : '';
+      const desc = typeof phaseItem.desc === 'string' ? phaseItem.desc.trim() : '';
+      const goal = typeof phaseItem.goal === 'string' ? phaseItem.goal.trim() : '';
+      const color = typeof phaseItem.color === 'string' ? phaseItem.color.trim() : '';
+      const rawTrackPlans = Array.isArray(phaseItem.tracks) ? phaseItem.tracks : [];
+
+      if (!id || !label || uniquePhaseIds.has(id)) {
+        return null;
+      }
+
+      const trackPlans = rawTrackPlans
+        .map((trackPlanItem) => {
+          if (!isRecord(trackPlanItem)) {
+            return null;
+          }
+
+          const track = typeof trackPlanItem.track === 'string' ? trackPlanItem.track.trim() : '';
+          const rawSteps = Array.isArray(trackPlanItem.steps) ? trackPlanItem.steps : [];
+          if (!track) {
+            return null;
+          }
+
+          const steps = rawSteps
+            .map((stepItem) => {
+              if (!isRecord(stepItem)) {
+                return null;
+              }
+
+              const stepId = typeof stepItem.id === 'string' ? stepItem.id.trim() : '';
+              const title = typeof stepItem.title === 'string' ? stepItem.title.trim() : '';
+              const detail = typeof stepItem.detail === 'string' ? stepItem.detail.trim() : '';
+              if (!stepId || !title) {
+                return null;
+              }
+
+              return {
+                id: stepId,
+                title,
+                detail,
+              };
+            })
+            .filter((step): step is NonNullable<typeof step> => step !== null);
+
+          if (steps.length === 0) {
+            return null;
+          }
+
+          return {
+            track,
+            steps,
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
+
+      if (trackPlans.length === 0) {
+        return null;
+      }
+
+      uniquePhaseIds.add(id);
+      return {
+        id,
+        label,
+        sublabel,
+        desc,
+        goal,
+        color: color || DEFAULT_TRACK_COLOR,
+        tracks: trackPlans,
+      };
+    })
+    .filter((phase): phase is Phase => phase !== null);
+
+  if (normalizedPhases.length === 0) {
+    return null;
+  }
+
+  normalizedPhases.forEach((phase) => {
+    phase.tracks.forEach((trackPlan) => {
+      if (!normalizedTracks[trackPlan.track]) {
+        normalizedTracks[trackPlan.track] = {
+          label: trackPlan.track,
+          color: DEFAULT_TRACK_COLOR,
+        };
+      }
+    });
+  });
+
+  return {
+    phases: normalizedPhases,
+    tracks: normalizedTracks,
+  };
+};
+
+const loadInitialRoadmapConfig = (): RoadmapConfig => {
+  try {
+    const raw = localStorage.getItem(ROADMAP_CONFIG_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_ROADMAP_CONFIG;
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    return normalizeRoadmapConfig(parsed) ?? DEFAULT_ROADMAP_CONFIG;
+  } catch {
+    return DEFAULT_ROADMAP_CONFIG;
+  }
+};
+
+const createPhaseDraftMap = (
+  phaseIds: PhaseId[],
+  previous: Record<PhaseId, TaskDraft> = {},
+): Record<PhaseId, TaskDraft> => {
+  const next: Record<PhaseId, TaskDraft> = {};
+  phaseIds.forEach((phaseId) => {
+    next[phaseId] = previous[phaseId] ?? makeDefaultDraft();
+  });
+  return next;
+};
+
 const withAlpha = (hexColor: string, alphaHex: string): string => {
   if (/^#[\da-fA-F]{6}$/.test(hexColor)) {
     return `${hexColor}${alphaHex}`;
@@ -231,8 +385,11 @@ const formatStamp = (value: string): string =>
   });
 
 function App() {
+  const [roadmapConfig, setRoadmapConfig] = useState<RoadmapConfig>(loadInitialRoadmapConfig);
+  const phases = roadmapConfig.phases;
+  const tracks = roadmapConfig.tracks;
   const [activeSection, setActiveSection] = useState<NavSection>('overview');
-  const [notesPhaseId, setNotesPhaseId] = useState<PhaseId>('p1');
+  const [notesPhaseId, setNotesPhaseId] = useState<PhaseId>(() => roadmapConfig.phases[0]?.id ?? 'p1');
   const [isDashboardOpen, setIsDashboardOpen] = useState<boolean>(true);
 
   const [doneSet, setDoneSet] = useState<Set<string>>(() => {
@@ -286,11 +443,9 @@ function App() {
 
   const [draft, setDraft] = useState<TaskDraft>(makeDefaultDraft);
 
-  const [phaseDrafts, setPhaseDrafts] = useState<Record<PhaseId, TaskDraft>>({
-    p1: makeDefaultDraft(),
-    p2: makeDefaultDraft(),
-    p3: makeDefaultDraft(),
-  });
+  const [phaseDrafts, setPhaseDrafts] = useState<Record<PhaseId, TaskDraft>>(() =>
+    createPhaseDraftMap(roadmapConfig.phases.map((phase) => phase.id)),
+  );
   const [scheduleEvents, setScheduleEvents] = useState<ScheduleEventItem[]>(() => {
     try {
       const raw = localStorage.getItem(SCHEDULE_STORAGE_KEY);
@@ -314,6 +469,7 @@ function App() {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string>('');
   const [draggingScheduleId, setDraggingScheduleId] = useState<string | null>(null);
+  const [roadmapConfigError, setRoadmapConfigError] = useState<string>('');
   const [scheduleTimeline, setScheduleTimeline] = useState<ScheduleTimelineItem[]>(() => {
     try {
       const raw = localStorage.getItem(SCHEDULE_TIMELINE_STORAGE_KEY);
@@ -322,6 +478,7 @@ function App() {
       return [];
     }
   });
+  const phaseIds = useMemo(() => phases.map((phase) => phase.id), [phases]);
 
   useEffect(() => {
     localStorage.setItem(ROADMAP_STORAGE_KEY, JSON.stringify([...doneSet]));
@@ -351,6 +508,29 @@ function App() {
     localStorage.setItem(SCHEDULE_TIMELINE_STORAGE_KEY, JSON.stringify(scheduleTimeline));
   }, [scheduleTimeline]);
 
+  useEffect(() => {
+    localStorage.setItem(ROADMAP_CONFIG_STORAGE_KEY, JSON.stringify(roadmapConfig));
+  }, [roadmapConfig]);
+
+  useEffect(() => {
+    setPhaseDrafts((prev) => {
+      const next = createPhaseDraftMap(phaseIds, prev);
+      const prevKeys = Object.keys(prev);
+      const sameShape = prevKeys.length === phaseIds.length && phaseIds.every((phaseId) => phaseId in prev);
+      const sameValues = sameShape && phaseIds.every((phaseId) => prev[phaseId] === next[phaseId]);
+      return sameValues ? prev : next;
+    });
+
+    setNotesPhaseId((prev) => (phaseIds.includes(prev) ? prev : phaseIds[0] ?? prev));
+    setActiveSection((prev) => {
+      if (prev === 'overview' || prev === 'schedule' || prev === 'tasks' || prev === 'notes') {
+        return prev;
+      }
+
+      return phaseIds.includes(prev) ? prev : 'overview';
+    });
+  }, [phaseIds]);
+
   const toggleStep = (stepId: string): void => {
     setDoneSet((prev) => {
       const next = new Set(prev);
@@ -379,25 +559,28 @@ function App() {
     });
   };
 
-  const allRoadmapDone = ALL_STEPS.filter((step) => doneSet.has(step.id)).length;
-  const roadmapProgress = Math.round((allRoadmapDone / ALL_STEPS.length) * 100);
+  const allSteps = useMemo(() => phases.flatMap((phase) => phase.tracks.flatMap((track) => track.steps)), [phases]);
+  const allRoadmapDone = allSteps.filter((step) => doneSet.has(step.id)).length;
+  const roadmapProgress = allSteps.length > 0 ? Math.round((allRoadmapDone / allSteps.length) * 100) : 0;
 
   const sortedTasks = useMemo(() => sortTaskLikeItems(tasks), [tasks]);
   const sortedPhaseTasks = useMemo(() => sortTaskLikeItems(phaseTasks), [phaseTasks]);
 
   const phaseTasksByPhase = useMemo(() => {
-    const base: Record<PhaseId, PhaseTaskItem[]> = {
-      p1: [],
-      p2: [],
-      p3: [],
-    };
+    const base: Record<PhaseId, PhaseTaskItem[]> = {};
+    phaseIds.forEach((phaseId) => {
+      base[phaseId] = [];
+    });
 
     sortedPhaseTasks.forEach((task) => {
+      if (!base[task.phaseId]) {
+        base[task.phaseId] = [];
+      }
       base[task.phaseId].push(task);
     });
 
     return base;
-  }, [sortedPhaseTasks]);
+  }, [phaseIds, sortedPhaseTasks]);
 
   const openTasksTotal =
     tasks.filter((task) => !task.done).length + phaseTasks.filter((task) => !task.done).length;
@@ -464,7 +647,7 @@ function App() {
 
   const handleAddPhaseTask = (event: FormEvent<HTMLFormElement>, phaseId: PhaseId): void => {
     event.preventDefault();
-    const currentDraft = phaseDrafts[phaseId];
+    const currentDraft = phaseDrafts[phaseId] ?? makeDefaultDraft();
     if (!currentDraft.title.trim()) {
       return;
     }
@@ -473,7 +656,7 @@ function App() {
     setPhaseDrafts((prev) => ({
       ...prev,
       [phaseId]: {
-        ...prev[phaseId],
+        ...(prev[phaseId] ?? makeDefaultDraft()),
         title: '',
         note: '',
         studyMinutes: '60',
@@ -485,7 +668,7 @@ function App() {
     setPhaseDrafts((prev) => ({
       ...prev,
       [phaseId]: {
-        ...prev[phaseId],
+        ...(prev[phaseId] ?? makeDefaultDraft()),
         ...patch,
       },
     }));
@@ -737,11 +920,34 @@ function App() {
     };
   };
 
+  const applyRoadmapConfig = (rawConfig: string): void => {
+    try {
+      const parsed = JSON.parse(rawConfig) as unknown;
+      const normalized = normalizeRoadmapConfig(parsed);
+      if (!normalized) {
+        setRoadmapConfigError(
+          'Config không hợp lệ. Cần có tracks + phases, mỗi phase có track và step (id/title/detail).',
+        );
+        return;
+      }
+
+      setRoadmapConfig(normalized);
+      setRoadmapConfigError('');
+    } catch {
+      setRoadmapConfigError('JSON không hợp lệ. Hãy kiểm tra dấu phẩy, dấu ngoặc hoặc dấu nháy.');
+    }
+  };
+
+  const resetRoadmapConfig = (): void => {
+    setRoadmapConfig(DEFAULT_ROADMAP_CONFIG);
+    setRoadmapConfigError('');
+  };
+
   const phaseProgress = (phase: Phase): { done: number; total: number; percent: number } => {
     const phaseSteps = phase.tracks.flatMap((track) => track.steps);
     const staticDone = phaseSteps.filter((step) => doneSet.has(step.id)).length;
 
-    const customTasks = phaseTasksByPhase[phase.id];
+    const customTasks = phaseTasksByPhase[phase.id] ?? [];
     const customDone = customTasks.filter((task) => task.done).length;
 
     const total = phaseSteps.length + customTasks.length;
@@ -755,7 +961,7 @@ function App() {
   };
 
   const phaseNotes = useMemo(() => {
-    const phase = PHASES.find((item) => item.id === notesPhaseId);
+    const phase = phases.find((item) => item.id === notesPhaseId);
     if (!phase) {
       return [];
     }
@@ -767,12 +973,12 @@ function App() {
           source: 'step' as const,
           title: step.title,
           note: stepNotes[step.id] ?? '',
-          detail: `${TRACKS[track.track].label} · ${phase.label}`,
+          detail: `${(tracks[track.track]?.label ?? track.track)} · ${phase.label}`,
         }))
         .filter((item) => item.note.trim().length > 0);
     });
 
-    const phaseTaskNoteItems: PhaseNoteItem[] = phaseTasksByPhase[notesPhaseId]
+    const phaseTaskNoteItems: PhaseNoteItem[] = (phaseTasksByPhase[notesPhaseId] ?? [])
       .filter((task) => task.note.trim().length > 0)
       .map((task) => ({
         id: task.id,
@@ -784,13 +990,14 @@ function App() {
       }));
 
     return [...phaseTaskNoteItems, ...stepNoteItems];
-  }, [notesPhaseId, phaseTasksByPhase, stepNotes]);
+  }, [notesPhaseId, phaseTasksByPhase, phases, stepNotes, tracks]);
 
   const topNavSections: NavItem[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'p1', label: 'Phase 1' },
-    { id: 'p2', label: 'Phase 2' },
-    { id: 'p3', label: 'Phase 3' },
+    ...phases.map((phase) => ({
+      id: phase.id,
+      label: phase.label,
+    })),
   ];
 
   const dashboardSections: NavItem[] = [
@@ -798,6 +1005,7 @@ function App() {
     { id: 'tasks', label: 'Task List' },
     { id: 'notes', label: 'Notes' },
   ];
+  const activePhase = phases.find((phase) => phase.id === activeSection) ?? null;
 
   return (
     <AppLayout
@@ -823,19 +1031,21 @@ function App() {
     >
       {activeSection === 'overview' && (
         <OverviewPage
+          phases={phases}
           phaseTaskCount={phaseTasks.length}
           openTasksTotal={openTasksTotal}
           totalStudyMinutes={totalStudyMinutes}
           totalNotesCount={totalNotesCount}
           onOpenPhase={(phaseId) => setActiveSection(phaseId)}
           phaseProgress={phaseProgress}
-          totalStepsCount={ALL_STEPS.length}
+          totalStepsCount={allSteps.length}
         />
       )}
 
-      {(activeSection === 'p1' || activeSection === 'p2' || activeSection === 'p3') && (
+      {activePhase && (
         <PhasePage
-          activePhaseId={activeSection}
+          phase={activePhase}
+          tracks={tracks}
           doneSet={doneSet}
           stepNotes={stepNotes}
           phaseTasksByPhase={phaseTasksByPhase}
@@ -899,11 +1109,16 @@ function App() {
 
       {activeSection === 'notes' && (
         <NotesPage
+          phases={phases}
           notesPhaseId={notesPhaseId}
           phaseNotes={phaseNotes}
           generalNote={generalNote}
           onPhaseChange={(phaseId) => setNotesPhaseId(phaseId)}
           onGeneralNoteChange={(note) => setGeneralNote(note)}
+          roadmapConfig={roadmapConfig}
+          roadmapConfigError={roadmapConfigError}
+          onApplyRoadmapConfig={applyRoadmapConfig}
+          onResetRoadmapConfig={resetRoadmapConfig}
           formatStamp={formatStamp}
         />
       )}

@@ -1,4 +1,4 @@
-import { Phase, Rule, ScheduleDay, TaskPriority, TrackKey, TrackMeta } from './types';
+import { Phase, RoadmapConfig, Rule, ScheduleDay, TaskPriority, TrackKey, TrackMeta } from './types';
 
 export const TRACKS: Record<TrackKey, TrackMeta> = {
   react: { label: '⚛ React', color: '#61dafb' },
@@ -286,6 +286,11 @@ export const PHASES: Phase[] = [
     ],
   },
 ];
+
+export const DEFAULT_ROADMAP_CONFIG: RoadmapConfig = {
+  tracks: TRACKS,
+  phases: PHASES,
+};
 
 export const SCHEDULE: ScheduleDay[] = [
   {

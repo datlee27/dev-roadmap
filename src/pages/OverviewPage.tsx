@@ -1,8 +1,9 @@
 import { CSSProperties } from 'react';
-import { PHASES, RULES } from '../data';
+import { RULES } from '../data';
 import { Phase, PhaseId } from '../types';
 
 interface OverviewPageProps {
+  phases: Phase[];
   phaseTaskCount: number;
   openTasksTotal: number;
   totalStudyMinutes: number;
@@ -13,6 +14,7 @@ interface OverviewPageProps {
 }
 
 function OverviewPage({
+  phases,
   phaseTaskCount,
   openTasksTotal,
   totalStudyMinutes,
@@ -38,7 +40,7 @@ function OverviewPage({
 
       <div className="stats-grid">
         <article className="stat-card">
-          <strong>{PHASES.length}</strong>
+          <strong>{phases.length}</strong>
           <p>Phases</p>
         </article>
         <article className="stat-card">
@@ -64,7 +66,7 @@ function OverviewPage({
       </div>
 
       <div className="phase-grid">
-        {PHASES.map((phase) => {
+        {phases.map((phase) => {
           const progress = phaseProgress(phase);
           return (
             <button

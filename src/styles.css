@@ -1203,6 +1203,24 @@ textarea {
   width: 100%;
 }
 
+.roadmap-config-box {
+  margin-top: 1rem;
+  border-top: 1px dashed #304055;
+  padding-top: 0.9rem;
+}
+
+.roadmap-config-box h3 {
+  margin: 0 0 0.35rem;
+}
+
+.roadmap-config-input {
+  width: 100%;
+  min-height: 220px;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
 @media (max-width: 1080px) {
   .stats-grid {
     grid-template-columns: repeat(3, minmax(150px, 1fr));

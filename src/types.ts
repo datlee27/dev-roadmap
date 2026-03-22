@@ -1,5 +1,5 @@
-export type TrackKey = 'react' | 'backend' | 'lc' | 'docker' | 'ielts' | 'project';
-export type PhaseId = 'p1' | 'p2' | 'p3';
+export type TrackKey = string;
+export type PhaseId = string;
 
 export interface TrackMeta {
   label: string;
@@ -61,4 +61,9 @@ export interface TaskItem {
 
 export interface PhaseTaskItem extends TaskItem {
   phaseId: PhaseId;
+}
+
+export interface RoadmapConfig {
+  tracks: Record<TrackKey, TrackMeta>;
+  phases: Phase[];
 }
