@@ -22,6 +22,7 @@ function SchedulePage({
   onDragEnd,
   onNudgeEvent,
   onEditEvent,
+  onDuplicateEvent,
   onDeleteEvent,
   onCompleteEvent,
   getScheduleEventStyle,
@@ -173,6 +174,17 @@ function SchedulePage({
                     onDragStart={(event) => onDragStart(event, item.id)}
                     onDragEnd={onDragEnd}
                   >
+                    <button
+                      type="button"
+                      className="calendar-event-clone-btn"
+                      onClick={() => onDuplicateEvent(item.id)}
+                      aria-label="Nhân bản sự kiện"
+                      title="Nhân bản sự kiện"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 6v12M6 12h12" />
+                      </svg>
+                    </button>
                     <header>
                       <strong>{item.title}</strong>
                       <span>

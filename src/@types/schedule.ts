@@ -61,6 +61,7 @@ export interface SchedulePageProps {
   onDragEnd: () => void;
   onNudgeEvent: (scheduleId: string, deltaMinutes: number) => void;
   onEditEvent: (item: ScheduleEventItem) => void;
+  onDuplicateEvent: (scheduleId: string) => void;
   onDeleteEvent: (scheduleId: string) => void;
   onCompleteEvent: (scheduleId: string) => void;
   getScheduleEventStyle: (item: ScheduleEventItem) => CSSProperties;

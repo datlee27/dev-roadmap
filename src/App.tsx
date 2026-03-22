@@ -337,6 +337,26 @@ const clampScheduleStart = (startMinute: number, durationMinute: number): number
   return Math.max(CALENDAR_START_MINUTE, Math.min(startMinute, Math.max(CALENDAR_START_MINUTE, maxStart)));
 };
 
+const getStartOfCurrentWeek = (currentDate: Date): Date => {
+  const base = new Date(currentDate);
+  base.setHours(0, 0, 0, 0);
+  const day = base.getDay();
+  const offsetToMonday = day === 0 ? 6 : day - 1;
+  base.setDate(base.getDate() - offsetToMonday);
+  return base;
+};
+
+const getCompletionStampByScheduleDay = (
+  scheduleItem: Pick<ScheduleEventItem, 'day' | 'endMinute'>,
+  referenceDate: Date = new Date(),
+): string => {
+  const startOfWeek = getStartOfCurrentWeek(referenceDate);
+  const completionDate = new Date(startOfWeek);
+  completionDate.setDate(startOfWeek.getDate() + DAY_ORDER[scheduleItem.day]);
+  completionDate.setHours(Math.floor(scheduleItem.endMinute / 60), scheduleItem.endMinute % 60, 0, 0);
+  return completionDate.toISOString();
+};
+
 const sortTaskLikeItems = <T extends Pick<TaskItem, 'done' | 'priority' | 'updatedAt'>>(items: T[]): T[] => {
   return [...items].sort((a, b) => {
     if (a.done !== b.done) {
@@ -819,13 +839,32 @@ function App() {
     );
   };
 
+  const duplicateScheduleEvent = (scheduleId: string): void => {
+    const selectedItem = scheduleEvents.find((item) => item.id === scheduleId);
+    if (!selectedItem) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    setScheduleEvents((prev) =>
+      sortScheduleItems([
+        ...prev,
+        {
+          ...selectedItem,
+          id: createId(),
+          updatedAt: now,
+        },
+      ]),
+    );
+  };
+
   const completeScheduleEvent = (scheduleId: string): void => {
     const selectedItem = scheduleEvents.find((item) => item.id === scheduleId);
     if (!selectedItem) {
       return;
     }
 
-    const completedAt = new Date().toISOString();
+    const completedAt = getCompletionStampByScheduleDay(selectedItem);
     setScheduleTimeline((prev) =>
       sortScheduleTimelineItems([
         {
@@ -1085,6 +1124,7 @@ function App() {
           onDragEnd={() => setDraggingScheduleId(null)}
           onNudgeEvent={nudgeScheduleEvent}
           onEditEvent={editScheduleEvent}
+          onDuplicateEvent={duplicateScheduleEvent}
           onDeleteEvent={deleteScheduleEvent}
           onCompleteEvent={completeScheduleEvent}
           getScheduleEventStyle={getScheduleEventStyle}
