@@ -13,6 +13,17 @@ export interface ScheduleEventItem {
   updatedAt: string;
 }
 
+export interface ScheduleTimelineItem {
+  id: string;
+  title: string;
+  day: ScheduleDayId;
+  startMinute: number;
+  endMinute: number;
+  note: string;
+  color: string;
+  completedAt: string;
+}
+
 export interface ScheduleDraft {
   title: string;
   day: ScheduleDayId;
@@ -51,6 +62,7 @@ export interface SchedulePageProps {
   onNudgeEvent: (scheduleId: string, deltaMinutes: number) => void;
   onEditEvent: (item: ScheduleEventItem) => void;
   onDeleteEvent: (scheduleId: string) => void;
+  onCompleteEvent: (scheduleId: string) => void;
   getScheduleEventStyle: (item: ScheduleEventItem) => CSSProperties;
   formatClockTime: (minutes: number) => string;
 }

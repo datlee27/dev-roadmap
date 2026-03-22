@@ -1,4 +1,5 @@
-import { FormEvent } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
+import { ScheduleDayId, ScheduleTimelineItem } from '../@types/schedule';
 import { PRIORITY_META } from '../data';
 import { TaskItem, TaskPriority } from '../types';
 
@@ -12,24 +13,63 @@ interface TaskDraftShape {
 interface TasksPageProps {
   draft: TaskDraftShape;
   tasks: TaskItem[];
+  scheduleTimeline: ScheduleTimelineItem[];
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDraftChange: (patch: Partial<TaskDraftShape>) => void;
   onUpsertTask: (taskId: string, patch: Partial<Omit<TaskItem, 'id' | 'createdAt'>>) => void;
   onDeleteTask: (taskId: string) => void;
   normalizeMinutes: (rawMinutes: string | number) => number;
   formatStamp: (value: string) => string;
+  formatClockTime: (minutes: number) => string;
 }
+
+const DAY_LABELS: Record<ScheduleDayId, string> = {
+  mon: 'Thứ 2',
+  tue: 'Thứ 3',
+  wed: 'Thứ 4',
+  thu: 'Thứ 5',
+  fri: 'Thứ 6',
+  sat: 'Thứ 7',
+  sun: 'Chủ nhật',
+};
+
+type TimelineFilter = 'week' | 'month';
+
+const getStartOfCurrentWeek = (current: Date): Date => {
+  const base = new Date(current);
+  base.setHours(0, 0, 0, 0);
+  const day = base.getDay();
+  const offset = day === 0 ? 6 : day - 1;
+  base.setDate(base.getDate() - offset);
+  return base;
+};
+
+const getStartOfCurrentMonth = (current: Date): Date => {
+  const base = new Date(current);
+  base.setHours(0, 0, 0, 0);
+  base.setDate(1);
+  return base;
+};
 
 function TasksPage({
   draft,
   tasks,
+  scheduleTimeline,
   onSubmit,
   onDraftChange,
   onUpsertTask,
   onDeleteTask,
   normalizeMinutes,
   formatStamp,
+  formatClockTime,
 }: TasksPageProps) {
+  const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>('week');
+  const filteredTimeline = useMemo(() => {
+    const now = new Date();
+    const startRange = timelineFilter === 'week' ? getStartOfCurrentWeek(now) : getStartOfCurrentMonth(now);
+    return scheduleTimeline.filter((item) => new Date(item.completedAt).getTime() >= startRange.getTime());
+  }, [scheduleTimeline, timelineFilter]);
+
   return (
     <section className="section fade-in">
       <p className="kicker">Task Manager</p>
@@ -164,6 +204,55 @@ function TasksPage({
             </footer>
           </article>
         ))}
+      </div>
+
+      <div className="timeline-panel">
+        <div className="timeline-head">
+          <div>
+            <h3>Timeline hoàn thành từ lịch</h3>
+            <p>Lưu lại chính xác ngày giờ bạn đã hoàn thành event ở Lịch học.</p>
+          </div>
+
+          <div className="timeline-filter-group" role="tablist" aria-label="Lọc timeline">
+            <button
+              type="button"
+              className={`timeline-filter-btn ${timelineFilter === 'week' ? 'active' : ''}`}
+              onClick={() => setTimelineFilter('week')}
+              aria-pressed={timelineFilter === 'week'}
+            >
+              Tuần này
+            </button>
+            <button
+              type="button"
+              className={`timeline-filter-btn ${timelineFilter === 'month' ? 'active' : ''}`}
+              onClick={() => setTimelineFilter('month')}
+              aria-pressed={timelineFilter === 'month'}
+            >
+              Tháng này
+            </button>
+          </div>
+        </div>
+
+        <div className="timeline-list">
+          {filteredTimeline.length === 0 && (
+            <p className="empty">Chưa có dữ liệu hoàn thành trong bộ lọc hiện tại.</p>
+          )}
+
+          {filteredTimeline.map((item) => (
+            <article key={item.id} className="timeline-card" style={{ borderLeftColor: item.color }}>
+              <header>
+                <strong>{item.title}</strong>
+                <span>{formatStamp(item.completedAt)}</span>
+              </header>
+
+              <p>
+                {DAY_LABELS[item.day]} · {formatClockTime(item.startMinute)} - {formatClockTime(item.endMinute)}
+              </p>
+
+              {item.note.trim() && <small>Ghi chú: {item.note}</small>}
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );

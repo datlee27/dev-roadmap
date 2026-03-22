@@ -3,7 +3,7 @@ import AppFooter from './components/layout/AppFooter';
 import AppHeader from './components/layout/AppHeader';
 import LeftDashboard from './components/layout/LeftDashboard';
 import { NavItem, NavSection } from './@types/navigation';
-import { ScheduleDayId, ScheduleDraft, ScheduleEventItem, WeekDayItem } from './@types/schedule';
+import { ScheduleDayId, ScheduleDraft, ScheduleEventItem, ScheduleTimelineItem, WeekDayItem } from './@types/schedule';
 import { PHASES, PRIORITY_META, TRACKS } from './data';
 import AppLayout from './layouts/AppLayout';
 import NotesPage from './pages/NotesPage';
@@ -20,6 +20,7 @@ const PHASE_TASK_STORAGE_KEY = 'dev-roadmap-v2-phase-tasks';
 const STEP_NOTE_STORAGE_KEY = 'dev-roadmap-v2-step-notes';
 const GENERAL_NOTE_STORAGE_KEY = 'dev-roadmap-v2-general-note';
 const SCHEDULE_STORAGE_KEY = 'dev-roadmap-v3-schedule';
+const SCHEDULE_TIMELINE_STORAGE_KEY = 'dev-roadmap-v3-schedule-timeline';
 type StepNoteMap = Record<string, string>;
 
 interface TaskDraft {
@@ -163,6 +164,10 @@ const sortScheduleItems = (items: ScheduleEventItem[]): ScheduleEventItem[] => {
 
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
+};
+
+const sortScheduleTimelineItems = (items: ScheduleTimelineItem[]): ScheduleTimelineItem[] => {
+  return [...items].sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
 };
 
 const withAlpha = (hexColor: string, alphaHex: string): string => {
@@ -309,6 +314,14 @@ function App() {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string>('');
   const [draggingScheduleId, setDraggingScheduleId] = useState<string | null>(null);
+  const [scheduleTimeline, setScheduleTimeline] = useState<ScheduleTimelineItem[]>(() => {
+    try {
+      const raw = localStorage.getItem(SCHEDULE_TIMELINE_STORAGE_KEY);
+      return raw ? sortScheduleTimelineItems(JSON.parse(raw) as ScheduleTimelineItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem(ROADMAP_STORAGE_KEY, JSON.stringify([...doneSet]));
@@ -333,6 +346,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(scheduleEvents));
   }, [scheduleEvents]);
+
+  useEffect(() => {
+    localStorage.setItem(SCHEDULE_TIMELINE_STORAGE_KEY, JSON.stringify(scheduleTimeline));
+  }, [scheduleTimeline]);
 
   const toggleStep = (stepId: string): void => {
     setDoneSet((prev) => {
@@ -619,6 +636,35 @@ function App() {
     );
   };
 
+  const completeScheduleEvent = (scheduleId: string): void => {
+    const selectedItem = scheduleEvents.find((item) => item.id === scheduleId);
+    if (!selectedItem) {
+      return;
+    }
+
+    const completedAt = new Date().toISOString();
+    setScheduleTimeline((prev) =>
+      sortScheduleTimelineItems([
+        {
+          id: createId(),
+          title: selectedItem.title,
+          day: selectedItem.day,
+          startMinute: selectedItem.startMinute,
+          endMinute: selectedItem.endMinute,
+          note: selectedItem.note,
+          color: selectedItem.color,
+          completedAt,
+        },
+        ...prev,
+      ]),
+    );
+    setScheduleEvents((prev) => prev.filter((item) => item.id !== scheduleId));
+
+    if (editingScheduleId === scheduleId) {
+      resetScheduleDraft();
+    }
+  };
+
   const handleScheduleDragStart = (
     dragEvent: DragEvent<HTMLElement>,
     scheduleId: string,
@@ -830,6 +876,7 @@ function App() {
           onNudgeEvent={nudgeScheduleEvent}
           onEditEvent={editScheduleEvent}
           onDeleteEvent={deleteScheduleEvent}
+          onCompleteEvent={completeScheduleEvent}
           getScheduleEventStyle={getScheduleEventStyle}
           formatClockTime={formatClockTime}
         />
@@ -845,6 +892,8 @@ function App() {
           onDeleteTask={deleteTask}
           normalizeMinutes={normalizeMinutes}
           formatStamp={formatStamp}
+          scheduleTimeline={scheduleTimeline}
+          formatClockTime={formatClockTime}
         />
       )}
 
