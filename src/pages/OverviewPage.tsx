@@ -4,6 +4,7 @@ import { Phase, PhaseId } from '../types';
 
 interface OverviewPageProps {
   phases: Phase[];
+  roadmapProgress: number;
   phaseTaskCount: number;
   openTasksTotal: number;
   totalStudyMinutes: number;
@@ -15,6 +16,7 @@ interface OverviewPageProps {
 
 function OverviewPage({
   phases,
+  roadmapProgress,
   phaseTaskCount,
   openTasksTotal,
   totalStudyMinutes,
@@ -23,18 +25,26 @@ function OverviewPage({
   phaseProgress,
   totalStepsCount,
 }: OverviewPageProps) {
+  const nextPhase = phases.find((phase) => phaseProgress(phase).percent < 100) ?? phases[0] ?? null;
+  const progressLabel =
+    roadmapProgress >= 80
+      ? 'Sắp hoàn thành roadmap'
+      : roadmapProgress >= 40
+        ? 'Đang đi đúng hướng'
+        : 'Cần thêm nhịp học đều';
+
   return (
     <section className="section fade-in">
       <div className="hero">
-        <p className="kicker">Lộ trình học + theo dõi task thực chiến</p>
+        <p className="kicker">Tổng quan roadmap + đánh giá tiến độ</p>
         <h1>
-          React + Vite + TSX
+          Roadmap
           <br />
-          <span>Roadmap 3 tháng có theo dõi tiến độ thật.</span>
+          <span>Tổng kết chung cho toàn bộ lộ trình.</span>
         </h1>
         <p className="hero-copy">
-          Đánh dấu roadmap, thêm task trong từng phase, ghi chú theo từng bước và gom toàn bộ ghi chú ở tab Notes để
-          ôn lại nhanh.
+          Theo dõi phase, task, giờ học và ghi chú ở một nơi. Muốn mở rộng lộ trình thì bấm nút + cạnh Overview để
+          thêm phase mới.
         </p>
       </div>
 
@@ -62,6 +72,20 @@ function OverviewPage({
         <article className="stat-card">
           <strong>{totalNotesCount}</strong>
           <p>Tổng ghi chú</p>
+        </article>
+      </div>
+
+      <div className="overview-insight">
+        <article>
+          <span>Đánh giá tiến độ</span>
+          <strong>{progressLabel}</strong>
+          <p>{roadmapProgress}% tổng roadmap đã hoàn thành.</p>
+        </article>
+
+        <article>
+          <span>Phase nên tập trung</span>
+          <strong>{nextPhase?.label ?? 'Chưa có phase'}</strong>
+          <p>{nextPhase ? `${phaseProgress(nextPhase).percent}% hoàn thành trong phase này.` : 'Thêm phase để bắt đầu.'}</p>
         </article>
       </div>
 
@@ -93,7 +117,7 @@ function OverviewPage({
         })}
       </div>
 
-      <div className="rule-grid">
+      {/* <div className="rule-grid">
         {RULES.map((rule) => (
           <article key={rule.title} className="rule-card">
             <span>{rule.emoji}</span>
@@ -103,7 +127,7 @@ function OverviewPage({
             </div>
           </article>
         ))}
-      </div>
+      </div> */}
     </section>
   );
 }

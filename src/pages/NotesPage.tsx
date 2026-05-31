@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { Phase, PhaseId, RoadmapConfig } from '../types';
+import { Phase, PhaseId } from '../types';
 
 interface PhaseNoteItem {
   id: string;
@@ -15,12 +14,8 @@ interface NotesPageProps {
   notesPhaseId: PhaseId;
   phaseNotes: PhaseNoteItem[];
   generalNote: string;
-  roadmapConfig: RoadmapConfig;
-  roadmapConfigError: string;
   onPhaseChange: (phaseId: PhaseId) => void;
   onGeneralNoteChange: (note: string) => void;
-  onApplyRoadmapConfig: (rawConfig: string) => void;
-  onResetRoadmapConfig: () => void;
   formatStamp: (value: string) => string;
 }
 
@@ -29,20 +24,10 @@ function NotesPage({
   notesPhaseId,
   phaseNotes,
   generalNote,
-  roadmapConfig,
-  roadmapConfigError,
   onPhaseChange,
   onGeneralNoteChange,
-  onApplyRoadmapConfig,
-  onResetRoadmapConfig,
   formatStamp,
 }: NotesPageProps) {
-  const [configDraft, setConfigDraft] = useState<string>(() => JSON.stringify(roadmapConfig, null, 2));
-
-  useEffect(() => {
-    setConfigDraft(JSON.stringify(roadmapConfig, null, 2));
-  }, [roadmapConfig]);
-
   return (
     <section className="section fade-in">
       <p className="kicker">Notes Hub</p>
@@ -74,7 +59,7 @@ function NotesPage({
                   <strong>{item.title}</strong>
                   <span className={`note-tag ${item.source}`}>{item.source === 'phase-task' ? 'Task phase' : 'Step note'}</span>
                 </header>
-                <p>{item.note}</p>
+                <p className="formatted-note">{item.note}</p>
                 <footer>
                   <span>{item.detail}</span>
                   {item.updatedAt && <span>{formatStamp(item.updatedAt)}</span>}
@@ -92,34 +77,11 @@ function NotesPage({
             rows={16}
             value={generalNote}
             onChange={(event) => onGeneralNoteChange(event.target.value)}
-            placeholder="Ví dụ: Tuần này tập trung hoàn tất auth flow + 5 bài LeetCode..."
+            placeholder="Note"
           />
           <p className="notes-helper">
             {generalNote.trim() ? 'Đã lưu tự động vào localStorage.' : 'Chưa có ghi chú chung.'}
           </p>
-
-          <div className="roadmap-config-box">
-            <h3>Cấu hình roadmap (không hardcode)</h3>
-            <p className="notes-helper">
-              Bạn có thể sửa JSON để đổi phase/track/step cho user khác mà không cần sửa source code.
-            </p>
-            <textarea
-              className="roadmap-config-input"
-              rows={14}
-              value={configDraft}
-              onChange={(event) => setConfigDraft(event.target.value)}
-              placeholder="Roadmap config JSON..."
-            />
-            <div className="schedule-form-actions">
-              <button type="button" className="primary-btn" onClick={() => onApplyRoadmapConfig(configDraft)}>
-                Lưu cấu hình
-              </button>
-              <button type="button" className="ghost-btn" onClick={onResetRoadmapConfig}>
-                Khôi phục mặc định
-              </button>
-            </div>
-            {roadmapConfigError && <p className="schedule-error">{roadmapConfigError}</p>}
-          </div>
         </article>
       </div>
     </section>

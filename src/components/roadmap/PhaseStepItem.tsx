@@ -7,9 +7,19 @@ interface PhaseStepItemProps {
   noteValue: string;
   onToggle: () => void;
   onNoteChange: (note: string) => void;
+  onStepChange?: (patch: Partial<Pick<Step, 'title' | 'detail'>>) => void;
+  onDeleteStep?: () => void;
 }
 
-function PhaseStepItem({ step, isDone, noteValue, onToggle, onNoteChange }: PhaseStepItemProps) {
+function PhaseStepItem({
+  step,
+  isDone,
+  noteValue,
+  onToggle,
+  onNoteChange,
+  onStepChange,
+  onDeleteStep,
+}: PhaseStepItemProps) {
   const [expanded, setExpanded] = useState(false);
   const [showNote, setShowNote] = useState(Boolean(noteValue.trim()));
 
@@ -54,7 +64,40 @@ function PhaseStepItem({ step, isDone, noteValue, onToggle, onNoteChange }: Phas
 
       {(expanded || showNote) && (
         <div className="phase-step-body">
-          {expanded && <p className="phase-step-detail">{step.detail}</p>}
+          {expanded && (
+            <>
+              <p className="phase-step-detail">{step.detail || 'Chưa có mô tả cho step này.'}</p>
+
+              {onStepChange && (
+                <div className="phase-step-edit">
+                  <label>
+                    Tên step
+                    <input
+                      type="text"
+                      value={step.title}
+                      onChange={(event) => onStepChange({ title: event.target.value })}
+                    />
+                  </label>
+
+                  <label>
+                    Mô tả step
+                    <textarea
+                      rows={3}
+                      value={step.detail}
+                      onChange={(event) => onStepChange({ detail: event.target.value })}
+                      placeholder="Mục tiêu, output mong muốn, link hoặc checklist..."
+                    />
+                  </label>
+
+                  {onDeleteStep && (
+                    <button type="button" className="ghost-btn danger-btn" onClick={onDeleteStep}>
+                      Xóa step
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
           {showNote && (
             <label className="phase-step-note">

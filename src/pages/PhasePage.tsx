@@ -1,9 +1,31 @@
-import { FormEvent } from 'react';
+import { FormEvent, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from 'react';
 import PhaseStepItem from '../components/roadmap/PhaseStepItem';
 import { PRIORITY_META } from '../data';
-import { Phase, PhaseId, PhaseTaskItem, TaskPriority, TrackMeta } from '../types';
+import { Phase, PhaseId, PhaseTaskItem, Step, TaskPriority, TrackMeta } from '../types';
 
 type StepNoteMap = Record<string, string>;
+
+const normalizePhaseName = (value: string): string => value.trim().replace(/\s+/g, ' ');
+
+const getPhaseNameKey = (value: string): string => normalizePhaseName(value).toLocaleLowerCase('vi-VN');
+
+const getPhaseNameError = (value: string, phaseId: PhaseId, phases: Phase[]): string => {
+  const normalizedName = normalizePhaseName(value);
+
+  if (!normalizedName) {
+    return 'Tên phase không được để trống.';
+  }
+
+  const isDuplicate = phases.some(
+    (phase) => phase.id !== phaseId && getPhaseNameKey(phase.label) === getPhaseNameKey(normalizedName),
+  );
+
+  if (isDuplicate) {
+    return 'Tên phase đã tồn tại. Hãy chọn tên khác.';
+  }
+
+  return '';
+};
 
 interface PhaseDraftShape {
   title: string;
@@ -14,12 +36,23 @@ interface PhaseDraftShape {
 
 interface PhasePageProps {
   phase: Phase;
+  phases: Phase[];
   tracks: Record<string, TrackMeta>;
+  trackColors: { value: string; label: string }[];
+  canDeletePhase: boolean;
   doneSet: Set<string>;
   stepNotes: StepNoteMap;
   phaseTasksByPhase: Record<PhaseId, PhaseTaskItem[]>;
   phaseDrafts: Record<PhaseId, PhaseDraftShape>;
   phaseProgress: (phase: Phase) => { done: number; total: number; percent: number };
+  onUpdatePhase: (phaseId: PhaseId, patch: Partial<Omit<Phase, 'id' | 'tracks'>>) => void;
+  onDeletePhase: (phaseId: PhaseId) => void;
+  onAddTrack: (phaseId: PhaseId) => void;
+  onUpdateTrack: (trackKey: string, patch: Partial<TrackMeta>) => void;
+  onDeleteTrack: (phaseId: PhaseId, trackKey: string) => void;
+  onAddStep: (phaseId: PhaseId, trackKey: string) => void;
+  onUpdateStep: (phaseId: PhaseId, trackKey: string, stepId: string, patch: Partial<Pick<Step, 'title' | 'detail'>>) => void;
+  onDeleteStep: (phaseId: PhaseId, trackKey: string, stepId: string) => void;
   onToggleStep: (stepId: string) => void;
   onStepNoteChange: (stepId: string, note: string) => void;
   onAddPhaseTask: (event: FormEvent<HTMLFormElement>, phaseId: PhaseId) => void;
@@ -35,12 +68,23 @@ interface PhasePageProps {
 
 function PhasePage({
   phase,
+  phases,
   tracks,
+  trackColors,
+  canDeletePhase,
   doneSet,
   stepNotes,
   phaseTasksByPhase,
   phaseDrafts,
   phaseProgress,
+  onUpdatePhase,
+  onDeletePhase,
+  onAddTrack,
+  onUpdateTrack,
+  onDeleteTrack,
+  onAddStep,
+  onUpdateStep,
+  onDeleteStep,
   onToggleStep,
   onStepNoteChange,
   onAddPhaseTask,
@@ -50,6 +94,11 @@ function PhasePage({
   normalizeMinutes,
   formatStamp,
 }: PhasePageProps) {
+  const [openColorPicker, setOpenColorPicker] = useState<string | null>(null);
+  const [phaseNameDraft, setPhaseNameDraft] = useState<string>(phase.label);
+  const [phaseNameTouched, setPhaseNameTouched] = useState<boolean>(false);
+  const colorPickerCloseTimer = useRef<number | null>(null);
+  const skipPhaseNameCommit = useRef<boolean>(false);
   const progress = phaseProgress(phase);
   const phaseTaskList = phaseTasksByPhase[phase.id] ?? [];
   const currentDraft = phaseDrafts[phase.id] ?? {
@@ -57,6 +106,87 @@ function PhasePage({
     note: '',
     studyMinutes: '60',
     priority: 'medium' as TaskPriority,
+  };
+
+  useEffect(() => {
+    return () => {
+      if (colorPickerCloseTimer.current !== null) {
+        window.clearTimeout(colorPickerCloseTimer.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setPhaseNameDraft(phase.label);
+    setPhaseNameTouched(false);
+    setOpenColorPicker(null);
+  }, [phase.id]);
+
+  useEffect(() => {
+    if (!phaseNameTouched) {
+      setPhaseNameDraft(phase.label);
+    }
+  }, [phase.label, phaseNameTouched]);
+
+  const clearColorPickerCloseTimer = (): void => {
+    if (colorPickerCloseTimer.current !== null) {
+      window.clearTimeout(colorPickerCloseTimer.current);
+      colorPickerCloseTimer.current = null;
+    }
+  };
+
+  const scheduleColorPickerClose = (): void => {
+    clearColorPickerCloseTimer();
+    colorPickerCloseTimer.current = window.setTimeout(() => {
+      setOpenColorPicker(null);
+      colorPickerCloseTimer.current = null;
+    }, 180);
+  };
+
+  const toggleColorPicker = (event: MouseEvent<HTMLElement>, pickerId: string): void => {
+    event.preventDefault();
+    clearColorPickerCloseTimer();
+    setOpenColorPicker((current) => (current === pickerId ? null : pickerId));
+  };
+
+  const phaseNameError = getPhaseNameError(phaseNameDraft, phase.id, phases);
+  const showPhaseNameError = phaseNameTouched && Boolean(phaseNameError);
+
+  const commitPhaseName = (): void => {
+    if (skipPhaseNameCommit.current) {
+      skipPhaseNameCommit.current = false;
+      return;
+    }
+
+    setPhaseNameTouched(true);
+    if (phaseNameError) {
+      return;
+    }
+
+    const nextName = normalizePhaseName(phaseNameDraft);
+    setPhaseNameDraft(nextName);
+    setPhaseNameTouched(false);
+
+    if (nextName !== phase.label) {
+      onUpdatePhase(phase.id, { label: nextName });
+    }
+  };
+
+  const handlePhaseNameKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitPhaseName();
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      skipPhaseNameCommit.current = true;
+      setPhaseNameDraft(phase.label);
+      setPhaseNameTouched(false);
+      event.currentTarget.blur();
+    }
   };
 
   return (
@@ -80,20 +210,191 @@ function PhasePage({
           </div>
         </div>
 
+        <section className="phase-editor-panel">
+          <div className="phase-editor-head">
+            <div>
+              <h3>Tùy chỉnh phase</h3>
+              <p>Chỉnh nội dung phase, thêm track và step ngay tại màn hình này.</p>
+            </div>
+
+            <div className="phase-editor-actions">
+              <button type="button" className="ghost-btn" onClick={() => onAddTrack(phase.id)}>
+                + Add Track
+              </button>
+              <button
+                type="button"
+                className="ghost-btn danger-btn"
+                disabled={!canDeletePhase}
+                onClick={() => onDeletePhase(phase.id)}
+              >
+                Xóa phase
+              </button>
+            </div>
+          </div>
+
+          <div className="phase-editor-grid">
+            <label>
+              Tên phase
+              <input
+                type="text"
+                value={phaseNameDraft}
+                className={showPhaseNameError ? 'field-invalid' : ''}
+                aria-invalid={showPhaseNameError}
+                aria-describedby={showPhaseNameError ? 'phase-name-error' : undefined}
+                onChange={(event) => {
+                  setPhaseNameDraft(event.target.value);
+                  setPhaseNameTouched(true);
+                }}
+                onBlur={commitPhaseName}
+                onKeyDown={handlePhaseNameKeyDown}
+              />
+              {showPhaseNameError && (
+                <span id="phase-name-error" className="field-error">
+                  {phaseNameError}
+                </span>
+              )}
+            </label>
+
+            <label>
+              Nhãn thời gian
+              <input
+                type="text"
+                value={phase.sublabel}
+                onChange={(event) => onUpdatePhase(phase.id, { sublabel: event.target.value })}
+                placeholder="Ví dụ: Tuần 4-6"
+              />
+            </label>
+
+            <label>
+              Mô tả ngắn
+              <input
+                type="text"
+                value={phase.desc}
+                onChange={(event) => onUpdatePhase(phase.id, { desc: event.target.value })}
+              />
+            </label>
+
+            <label>
+              Màu phase
+              <details
+                className="compact-color-picker"
+                open={openColorPicker === 'phase'}
+                onMouseEnter={clearColorPickerCloseTimer}
+                onMouseLeave={scheduleColorPickerClose}
+              >
+                <summary aria-label="Chọn màu phase" title="Chọn màu phase" onClick={(event) => toggleColorPicker(event, 'phase')}>
+                  <span className="selected-color-swatch" style={{ backgroundColor: phase.color }} />
+                </summary>
+
+                <div className="compact-color-palette">
+                  {trackColors.map((colorItem) => (
+                    <button
+                      key={colorItem.value}
+                      type="button"
+                      className={`schedule-color-swatch ${phase.color === colorItem.value ? 'active' : ''}`}
+                      style={{ backgroundColor: colorItem.value }}
+                      onClick={() => {
+                        clearColorPickerCloseTimer();
+                        onUpdatePhase(phase.id, { color: colorItem.value });
+                        setOpenColorPicker(null);
+                      }}
+                      aria-label={`Chọn màu ${colorItem.label}`}
+                      title={`${colorItem.label} (${colorItem.value})`}
+                    />
+                  ))}
+                </div>
+              </details>
+            </label>
+          </div>
+
+          <label className="phase-editor-goal">
+            Mục tiêu phase
+            <textarea
+              rows={3}
+              value={phase.goal}
+              onChange={(event) => onUpdatePhase(phase.id, { goal: event.target.value })}
+              placeholder="Tóm tắt mục tiêu, kết quả mong muốn sau phase..."
+            />
+          </label>
+        </section>
+
         <div className="track-grid">
+          {phase.tracks.length === 0 && (
+            <p className="empty">Phase này chưa có track. Bấm Add Track để bắt đầu thêm roadmap step.</p>
+          )}
+
           {phase.tracks.map((track) => {
             const meta = tracks[track.track] ?? { label: track.track, color: '#61dafb' };
             const doneCount = track.steps.filter((step) => doneSet.has(step.id)).length;
+            const trackPickerId = `track:${track.track}`;
 
             return (
-              <article key={track.track} className="track-card">
-                <header>
-                  <h3 style={{ color: meta.color }}>{meta.label}</h3>
-                  <span>
-                    {doneCount}/{track.steps.length}
-                  </span>
+              <article key={track.track} className={`track-card ${openColorPicker === trackPickerId ? 'color-picker-open' : ''}`}>
+                <header className="track-card-head editable">
+                  <div className="track-title-edit">
+                    <input
+                      type="text"
+                      value={meta.label}
+                      onChange={(event) => onUpdateTrack(track.track, { label: event.target.value })}
+                      style={{ color: meta.color }}
+                      aria-label="Tên track"
+                    />
+                  </div>
+
+                  <details
+                    className="compact-color-picker track-color-picker"
+                    open={openColorPicker === trackPickerId}
+                    onMouseEnter={clearColorPickerCloseTimer}
+                    onMouseLeave={scheduleColorPickerClose}
+                  >
+                    <summary
+                      aria-label={`Chọn màu cho ${meta.label}`}
+                      title={`Chọn màu cho ${meta.label}`}
+                      onClick={(event) => toggleColorPicker(event, trackPickerId)}
+                    >
+                      <span className="selected-color-swatch" style={{ backgroundColor: meta.color }} />
+                    </summary>
+
+                    <div className="compact-color-palette">
+                      {trackColors.map((colorItem) => (
+                        <button
+                          key={colorItem.value}
+                          type="button"
+                          className={`schedule-color-swatch ${meta.color === colorItem.value ? 'active' : ''}`}
+                          style={{ backgroundColor: colorItem.value }}
+                          onClick={() => {
+                            clearColorPickerCloseTimer();
+                            onUpdateTrack(track.track, { color: colorItem.value });
+                            setOpenColorPicker(null);
+                          }}
+                          aria-label={`Chọn màu ${colorItem.label}`}
+                          title={`${colorItem.label} (${colorItem.value})`}
+                        />
+                      ))}
+                    </div>
+                  </details>
+
+                  <div className="track-inline-actions">
+                    <span>
+                      {doneCount}/{track.steps.length}
+                    </span>
+                    <button type="button" className="ghost-btn mini-action-btn" onClick={() => onAddStep(phase.id, track.track)}>
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-btn mini-action-btn danger-btn"
+                      onClick={() => onDeleteTrack(phase.id, track.track)}
+                    >
+                      -
+                    </button>
+                  </div>
                 </header>
                 <div className="track-steps">
+                  {track.steps.length === 0 && (
+                    <p className="empty inline-empty">Track này chưa có step. Bấm + Step để thêm nội dung học.</p>
+                  )}
+
                   {track.steps.map((step) => {
                     const isDone = doneSet.has(step.id);
                     const noteValue = stepNotes[step.id] ?? '';
@@ -106,6 +407,8 @@ function PhasePage({
                         noteValue={noteValue}
                         onToggle={() => onToggleStep(step.id)}
                         onNoteChange={(note) => onStepNoteChange(step.id, note)}
+                        onStepChange={(patch) => onUpdateStep(phase.id, track.track, step.id, patch)}
+                        onDeleteStep={() => onDeleteStep(phase.id, track.track, step.id)}
                       />
                     );
                   })}

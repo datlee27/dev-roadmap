@@ -30,11 +30,11 @@ function SchedulePage({
 }: SchedulePageProps) {
   return (
     <section className="section fade-in">
-      <p className="kicker">Weekly Planner - tạo, kéo-thả, tự sắp lịch</p>
+      <p className="kicker">Weekly Planner</p>
       <h2>Lịch học theo tuần</h2>
       <p className="hero-copy">
-        Tạo event mới, kéo-thả event vào ngày/giờ mong muốn, hoặc dùng nút -30p/+30p để tinh chỉnh nhanh. Dữ liệu
-        được lưu tự động trong trình duyệt.
+        {/* Tạo event mới, kéo-thả event vào ngày/giờ mong muốn, hoặc dùng nút -30p/+30p để tinh chỉnh nhanh. Dữ liệu
+        được lưu tự động trong trình duyệt. */}
       </p>
 
       <div className="schedule-builder">
@@ -191,6 +191,12 @@ function SchedulePage({
                         {formatClockTime(item.startMinute)} - {formatClockTime(item.endMinute)}
                       </span>
                     </header>
+                    {item.note.trim() && (
+                      <div className="calendar-event-note-tooltip" role="tooltip">
+                        <span>Ghi chú</span>
+                        <p className="formatted-note">{item.note}</p>
+                      </div>
+                    )}
                     <footer>
                       <button
                         type="button"

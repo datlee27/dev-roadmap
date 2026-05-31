@@ -11,7 +11,7 @@ import OverviewPage from './pages/OverviewPage';
 import PhasePage from './pages/PhasePage';
 import SchedulePage from './pages/SchedulePage';
 import TasksPage from './pages/TasksPage';
-import { Phase, PhaseId, PhaseTaskItem, RoadmapConfig, TaskItem, TaskPriority, TrackMeta } from './types';
+import { Phase, PhaseId, PhaseTaskItem, RoadmapConfig, Step, TaskItem, TaskPriority, TrackMeta } from './types';
 
 const ROADMAP_STORAGE_KEY = 'dev-roadmap-v2-progress';
 const LEGACY_ROADMAP_STORAGE_KEY = 'dev-roadmap-v1';
@@ -79,6 +79,8 @@ const SCHEDULE_COLORS: { value: string; label: string }[] = [
   { value: '#f0da48', label: 'Amber' },
   { value: '#ff7a90', label: 'Rose' },
 ];
+const ROADMAP_PHASE_COLORS = SCHEDULE_COLORS;
+const ROADMAP_TRACK_COLORS = SCHEDULE_COLORS;
 
 const DEFAULT_SCHEDULE_EVENTS: Omit<ScheduleEventItem, 'id' | 'updatedAt'>[] = [
   { title: 'Ở công ty (intern)', day: 'mon', startMinute: 10 * 60, endMinute: 17 * 60, color: '#61dafb', note: 'React task + học từ codebase.' },
@@ -120,6 +122,36 @@ const createId = (): string => {
 };
 
 const normalizeMinutes = (rawMinutes: string | number): number => Math.max(0, Number(rawMinutes) || 0);
+
+const normalizePhaseLabel = (value: string): string => value.trim().replace(/\s+/g, ' ');
+
+const getPhaseLabelKey = (value: string): string => normalizePhaseLabel(value).toLocaleLowerCase('vi-VN');
+
+const makeUniquePhaseLabel = (rawLabel: string, usedLabelKeys: Set<string>): string => {
+  const baseLabel = normalizePhaseLabel(rawLabel) || 'Phase';
+  let candidate = baseLabel;
+  let suffix = 2;
+
+  while (usedLabelKeys.has(getPhaseLabelKey(candidate))) {
+    candidate = `${baseLabel} ${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+};
+
+const makeNextPhaseLabel = (currentPhases: Phase[]): string => {
+  const usedLabelKeys = new Set(currentPhases.map((phase) => getPhaseLabelKey(phase.label)));
+  let nextIndex = currentPhases.length + 1;
+  let candidate = `Phase ${nextIndex}`;
+
+  while (usedLabelKeys.has(getPhaseLabelKey(candidate))) {
+    nextIndex += 1;
+    candidate = `Phase ${nextIndex}`;
+  }
+
+  return candidate;
+};
 
 const parseClockTime = (value: string): number | null => {
   const normalized = value.trim();
@@ -199,6 +231,7 @@ const normalizeRoadmapConfig = (value: unknown): RoadmapConfig | null => {
   });
 
   const uniquePhaseIds = new Set<string>();
+  const uniquePhaseLabels = new Set<string>();
   const normalizedPhases: Phase[] = value.phases
     .map((phaseItem) => {
       if (!isRecord(phaseItem)) {
@@ -250,10 +283,6 @@ const normalizeRoadmapConfig = (value: unknown): RoadmapConfig | null => {
             })
             .filter((step): step is NonNullable<typeof step> => step !== null);
 
-          if (steps.length === 0) {
-            return null;
-          }
-
           return {
             track,
             steps,
@@ -261,14 +290,13 @@ const normalizeRoadmapConfig = (value: unknown): RoadmapConfig | null => {
         })
         .filter((item): item is NonNullable<typeof item> => item !== null);
 
-      if (trackPlans.length === 0) {
-        return null;
-      }
+      const uniqueLabel = makeUniquePhaseLabel(label, uniquePhaseLabels);
 
       uniquePhaseIds.add(id);
+      uniquePhaseLabels.add(getPhaseLabelKey(uniqueLabel));
       return {
         id,
-        label,
+        label: uniqueLabel,
         sublabel,
         desc,
         goal,
@@ -489,7 +517,6 @@ function App() {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string>('');
   const [draggingScheduleId, setDraggingScheduleId] = useState<string | null>(null);
-  const [roadmapConfigError, setRoadmapConfigError] = useState<string>('');
   const [scheduleTimeline, setScheduleTimeline] = useState<ScheduleTimelineItem[]>(() => {
     try {
       const raw = localStorage.getItem(SCHEDULE_TIMELINE_STORAGE_KEY);
@@ -692,6 +719,246 @@ function App() {
         ...patch,
       },
     }));
+  };
+
+  const addRoadmapPhase = (): void => {
+    const nextIndex = phases.length + 1;
+    const phaseId = `phase-${createId()}`;
+    const label = makeNextPhaseLabel(phases);
+    const nextPhase: Phase = {
+      id: phaseId,
+      label,
+      sublabel: 'Custom',
+      desc: 'Phase mới',
+      goal: 'Thêm track, step và task để bắt đầu theo dõi tiến độ.',
+      color: ROADMAP_PHASE_COLORS[(nextIndex - 1) % ROADMAP_PHASE_COLORS.length].value,
+      tracks: [],
+    };
+
+    setRoadmapConfig((prev) => ({
+      ...prev,
+      phases: [...prev.phases, nextPhase],
+    }));
+    setActiveSection(phaseId);
+  };
+
+  const updateRoadmapPhase = (phaseId: PhaseId, patch: Partial<Omit<Phase, 'id' | 'tracks'>>): void => {
+    setRoadmapConfig((prev) => {
+      const nextPatch: Partial<Omit<Phase, 'id' | 'tracks'>> = { ...patch };
+
+      if (typeof patch.label === 'string') {
+        const label = normalizePhaseLabel(patch.label);
+        const isDuplicate = prev.phases.some(
+          (phase) => phase.id !== phaseId && getPhaseLabelKey(phase.label) === getPhaseLabelKey(label),
+        );
+
+        if (!label || isDuplicate) {
+          return prev;
+        }
+
+        nextPatch.label = label;
+      }
+
+      return {
+        ...prev,
+        phases: prev.phases.map((phase) =>
+          phase.id === phaseId
+            ? {
+                ...phase,
+                ...nextPatch,
+              }
+            : phase,
+        ),
+      };
+    });
+  };
+
+  const deleteRoadmapPhase = (phaseId: PhaseId): void => {
+    if (phases.length <= 1) {
+      return;
+    }
+
+    setRoadmapConfig((prev) => ({
+      ...prev,
+      phases: prev.phases.filter((phase) => phase.id !== phaseId),
+    }));
+    setPhaseTasks((prev) => prev.filter((task) => task.phaseId !== phaseId));
+    setActiveSection('overview');
+  };
+
+  const addRoadmapTrack = (phaseId: PhaseId): void => {
+    const targetPhase = phases.find((phase) => phase.id === phaseId);
+    const nextIndex = (targetPhase?.tracks.length ?? 0) + 1;
+    const trackKey = `track-${createId()}`;
+
+    setRoadmapConfig((prev) => ({
+      tracks: {
+        ...prev.tracks,
+        [trackKey]: {
+          label: `Track ${nextIndex}`,
+          color: ROADMAP_TRACK_COLORS[(nextIndex - 1) % ROADMAP_TRACK_COLORS.length].value,
+        },
+      },
+      phases: prev.phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              tracks: [
+                ...phase.tracks,
+                {
+                  track: trackKey,
+                  steps: [],
+                },
+              ],
+            }
+          : phase,
+      ),
+    }));
+  };
+
+  const updateRoadmapTrack = (trackKey: string, patch: Partial<TrackMeta>): void => {
+    setRoadmapConfig((prev) => ({
+      ...prev,
+      tracks: {
+        ...prev.tracks,
+        [trackKey]: {
+          label: patch.label ?? prev.tracks[trackKey]?.label ?? trackKey,
+          color: patch.color ?? prev.tracks[trackKey]?.color ?? DEFAULT_TRACK_COLOR,
+        },
+      },
+    }));
+  };
+
+  const deleteRoadmapTrack = (phaseId: PhaseId, trackKey: string): void => {
+    const removedStepIds = phases
+      .find((phase) => phase.id === phaseId)
+      ?.tracks.find((track) => track.track === trackKey)
+      ?.steps.map((step) => step.id) ?? [];
+
+    setRoadmapConfig((prev) => {
+      const nextPhases = prev.phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              tracks: phase.tracks.filter((track) => track.track !== trackKey),
+            }
+          : phase,
+      );
+      const isTrackStillUsed = nextPhases.some((phase) => phase.tracks.some((track) => track.track === trackKey));
+      const nextTracks = { ...prev.tracks };
+      if (!isTrackStillUsed) {
+        delete nextTracks[trackKey];
+      }
+
+      return {
+        tracks: nextTracks,
+        phases: nextPhases,
+      };
+    });
+    setDoneSet((prev) => {
+      const next = new Set(prev);
+      removedStepIds.forEach((stepId) => next.delete(stepId));
+      return next;
+    });
+    setStepNotes((prev) => {
+      const next = { ...prev };
+      removedStepIds.forEach((stepId) => {
+        delete next[stepId];
+      });
+      return next;
+    });
+  };
+
+  const addRoadmapStep = (phaseId: PhaseId, trackKey: string): void => {
+    setRoadmapConfig((prev) => ({
+      ...prev,
+      phases: prev.phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              tracks: phase.tracks.map((track) =>
+                track.track === trackKey
+                  ? {
+                      ...track,
+                      steps: [
+                        ...track.steps,
+                        {
+                          id: `step-${createId()}`,
+                          title: `Step ${track.steps.length + 1}`,
+                          detail: '',
+                        },
+                      ],
+                    }
+                  : track,
+              ),
+            }
+          : phase,
+      ),
+    }));
+  };
+
+  const updateRoadmapStep = (
+    phaseId: PhaseId,
+    trackKey: string,
+    stepId: string,
+    patch: Partial<Pick<Step, 'title' | 'detail'>>,
+  ): void => {
+    setRoadmapConfig((prev) => ({
+      ...prev,
+      phases: prev.phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              tracks: phase.tracks.map((track) =>
+                track.track === trackKey
+                  ? {
+                      ...track,
+                      steps: track.steps.map((step) =>
+                        step.id === stepId
+                          ? {
+                              ...step,
+                              ...patch,
+                            }
+                          : step,
+                      ),
+                    }
+                  : track,
+              ),
+            }
+          : phase,
+      ),
+    }));
+  };
+
+  const deleteRoadmapStep = (phaseId: PhaseId, trackKey: string, stepId: string): void => {
+    setRoadmapConfig((prev) => ({
+      ...prev,
+      phases: prev.phases.map((phase) =>
+        phase.id === phaseId
+          ? {
+              ...phase,
+              tracks: phase.tracks.map((track) =>
+                track.track === trackKey
+                  ? {
+                      ...track,
+                      steps: track.steps.filter((step) => step.id !== stepId),
+                    }
+                  : track,
+              ),
+            }
+          : phase,
+      ),
+    }));
+    setDoneSet((prev) => {
+      const next = new Set(prev);
+      next.delete(stepId);
+      return next;
+    });
+    setStepNotes((prev) => {
+      const next = { ...prev };
+      delete next[stepId];
+      return next;
+    });
   };
 
   const scheduleEventsByDay = useMemo(() => {
@@ -959,29 +1226,6 @@ function App() {
     };
   };
 
-  const applyRoadmapConfig = (rawConfig: string): void => {
-    try {
-      const parsed = JSON.parse(rawConfig) as unknown;
-      const normalized = normalizeRoadmapConfig(parsed);
-      if (!normalized) {
-        setRoadmapConfigError(
-          'Config không hợp lệ. Cần có tracks + phases, mỗi phase có track và step (id/title/detail).',
-        );
-        return;
-      }
-
-      setRoadmapConfig(normalized);
-      setRoadmapConfigError('');
-    } catch {
-      setRoadmapConfigError('JSON không hợp lệ. Hãy kiểm tra dấu phẩy, dấu ngoặc hoặc dấu nháy.');
-    }
-  };
-
-  const resetRoadmapConfig = (): void => {
-    setRoadmapConfig(DEFAULT_ROADMAP_CONFIG);
-    setRoadmapConfigError('');
-  };
-
   const phaseProgress = (phase: Phase): { done: number; total: number; percent: number } => {
     const phaseSteps = phase.tracks.flatMap((track) => track.steps);
     const staticDone = phaseSteps.filter((step) => doneSet.has(step.id)).length;
@@ -1053,6 +1297,7 @@ function App() {
           sections={topNavSections}
           activeSection={activeSection}
           onNavigate={setActiveSection}
+          onAddPhase={addRoadmapPhase}
           roadmapProgress={roadmapProgress}
           isDashboardOpen={isDashboardOpen}
           onToggleDashboard={() => setIsDashboardOpen((prev) => !prev)}
@@ -1071,6 +1316,7 @@ function App() {
       {activeSection === 'overview' && (
         <OverviewPage
           phases={phases}
+          roadmapProgress={roadmapProgress}
           phaseTaskCount={phaseTasks.length}
           openTasksTotal={openTasksTotal}
           totalStudyMinutes={totalStudyMinutes}
@@ -1084,12 +1330,23 @@ function App() {
       {activePhase && (
         <PhasePage
           phase={activePhase}
+          phases={phases}
           tracks={tracks}
+          trackColors={ROADMAP_TRACK_COLORS}
+          canDeletePhase={phases.length > 1}
           doneSet={doneSet}
           stepNotes={stepNotes}
           phaseTasksByPhase={phaseTasksByPhase}
           phaseDrafts={phaseDrafts}
           phaseProgress={phaseProgress}
+          onUpdatePhase={updateRoadmapPhase}
+          onDeletePhase={deleteRoadmapPhase}
+          onAddTrack={addRoadmapTrack}
+          onUpdateTrack={updateRoadmapTrack}
+          onDeleteTrack={deleteRoadmapTrack}
+          onAddStep={addRoadmapStep}
+          onUpdateStep={updateRoadmapStep}
+          onDeleteStep={deleteRoadmapStep}
           onToggleStep={toggleStep}
           onStepNoteChange={updateStepNote}
           onAddPhaseTask={handleAddPhaseTask}
@@ -1155,10 +1412,6 @@ function App() {
           generalNote={generalNote}
           onPhaseChange={(phaseId) => setNotesPhaseId(phaseId)}
           onGeneralNoteChange={(note) => setGeneralNote(note)}
-          roadmapConfig={roadmapConfig}
-          roadmapConfigError={roadmapConfigError}
-          onApplyRoadmapConfig={applyRoadmapConfig}
-          onResetRoadmapConfig={resetRoadmapConfig}
           formatStamp={formatStamp}
         />
       )}

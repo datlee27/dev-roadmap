@@ -4,6 +4,7 @@ interface AppHeaderProps {
   sections: NavItem[];
   activeSection: NavSection;
   onNavigate: (section: NavSection) => void;
+  onAddPhase?: () => void;
   roadmapProgress: number;
   isDashboardOpen: boolean;
   onToggleDashboard: () => void;
@@ -13,6 +14,7 @@ function AppHeader({
   sections,
   activeSection,
   onNavigate,
+  onAddPhase,
   roadmapProgress,
   isDashboardOpen,
   onToggleDashboard,
@@ -33,15 +35,28 @@ function AppHeader({
       </div>
 
       <nav className="topnav">
-        {sections.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            className={`nav-btn ${activeSection === section.id ? 'active' : ''}`}
-            onClick={() => onNavigate(section.id)}
-          >
-            {section.label}
-          </button>
+        {sections.map((section, index) => (
+          <span key={section.id} className="topnav-item">
+            <button
+              type="button"
+              className={`nav-btn ${activeSection === section.id ? 'active' : ''}`}
+              onClick={() => onNavigate(section.id)}
+            >
+              {section.label}
+            </button>
+
+            {index === 0 && onAddPhase && (
+              <button
+                type="button"
+                className="nav-add-phase-btn"
+                onClick={onAddPhase}
+                aria-label="Thêm phase mới"
+                title="Thêm phase mới"
+              >
+                +
+              </button>
+            )}
+          </span>
         ))}
       </nav>
 
