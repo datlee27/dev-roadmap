@@ -1,5 +1,6 @@
 import { Phase, RoadmapConfig, Rule, ScheduleDay, TaskPriority, TrackKey, TrackMeta } from './types';
 
+/* 
 export const TRACKS: Record<TrackKey, TrackMeta> = {
   react: { label: '⚛ React', color: '#61dafb' },
   backend: { label: '☕ Java Backend', color: '#f89820' },
@@ -8,7 +9,10 @@ export const TRACKS: Record<TrackKey, TrackMeta> = {
   ielts: { label: '🗣 IELTS', color: '#c084fc' },
   project: { label: '🚀 Project', color: '#34d399' },
 };
+*/
+export const TRACKS: Record<TrackKey, TrackMeta> = {};
 
+/*
 export const PHASES: Phase[] = [
   {
     id: 'p1',
@@ -286,12 +290,15 @@ export const PHASES: Phase[] = [
     ],
   },
 ];
+*/
+export const PHASES: Phase[] = [];
 
 export const DEFAULT_ROADMAP_CONFIG: RoadmapConfig = {
   tracks: TRACKS,
   phases: PHASES,
 };
 
+/*
 export const SCHEDULE: ScheduleDay[] = [
   {
     day: 'Thứ 2 - Thứ 6',
@@ -366,7 +373,10 @@ export const SCHEDULE: ScheduleDay[] = [
     ],
   },
 ];
+*/
+export const SCHEDULE: ScheduleDay[] = [];
 
+/*
 export const RULES: Rule[] = [
   {
     emoji: '🔨',
@@ -387,6 +397,14 @@ export const RULES: Rule[] = [
     emoji: '🧩',
     title: 'LeetCode: 1 bài/ngày là đủ',
     desc: 'Mục tiêu không phải giỏi thuật toán mà là quen pattern. Đừng dành quá 1 tiếng cho bất kỳ bài nào.',
+  },
+];
+*/
+export const RULES: Rule[] = [
+  {
+    emoji: '🚀',
+    title: 'Bắt đầu lộ trình của bạn',
+    desc: 'Hãy tùy chỉnh các phase, thêm task và theo dõi tiến độ mỗi ngày.',
   },
 ];
 

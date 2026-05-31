@@ -38,6 +38,7 @@ button{font-family:var(--ff)}
 const { useState, useCallback, useRef, useEffect } = React;
 
 /* ─── DATA ─── */
+/*
 const TRACKS = {
   react:   { label:'⚛ React',         color:'#61dafb' },
   backend: { label:'☕ Java Backend',  color:'#f89820' },
@@ -46,7 +47,10 @@ const TRACKS = {
   ielts:   { label:'🗣 IELTS',          color:'#c084fc' },
   project: { label:'🚀 Project',        color:'#34d399' },
 };
+*/
+const TRACKS = {};
 
+/*
 const PHASES = [
   {
     id:'p1', label:'Phase 1', sublabel:'Tuần 1–4', desc:'Củng cố nền tảng',
@@ -128,7 +132,16 @@ const PHASES = [
     ]
   },
 ];
+*/
+const PHASES = [
+  {
+    id:'p1', label:'Phase 1', sublabel:'Giai đoạn 1', desc:'Bắt đầu lộ trình',
+    goal:'Xác định mục tiêu và thêm các bước học tập...', color:'#61dafb',
+    tracks:[]
+  }
+];
 
+/*
 const SCHEDULE = [
   { day:'Thứ 2 – Thứ 6', color:'#e8ff47', slots:[
     {time:'10:00–17:00',label:'Ở công ty (intern)',color:'#61dafb',desc:'80% làm React task. Khi rảnh: đọc codebase, IELTS listening (đeo tai nghe). Ghi lại 1–2 pattern mỗi ngày.'},
@@ -146,12 +159,19 @@ const SCHEDULE = [
     {time:'1–2h',label:'IELTS + Review tuần',color:'#c084fc',desc:'Xem lại ghi chép tuần. Ôn 3–5 LeetCode đã làm. Không học mới. Ngủ đủ giấc.'},
   ]},
 ];
+*/
+const SCHEDULE = [];
 
+/*
 const RULES = [
   {emoji:'🔨',title:'Build, đừng chỉ xem',desc:'Mỗi concept học xong phải có code tay. Xem tutorial mà không code là lãng phí 80% thời gian.'},
   {emoji:'🚀',title:'Project là thứ duy nhất tính',desc:'CV fresher không có project thực thì không qua được vòng lọc. Task Manager App là ưu tiên tuyệt đối.'},
   {emoji:'🏢',title:'Intern là lớp học miễn phí tốt nhất',desc:'Mỗi ngày ghi lại 1 thứ học được từ codebase công ty. Sau 3 tháng bạn có kho kiến thức thực chiến.'},
   {emoji:'🧩',title:'LeetCode: 1 bài/ngày là đủ',desc:'Mục tiêu không phải giỏi thuật toán mà là quen pattern. Đừng dành quá 1 tiếng cho bất kỳ bài nào.'},
+];
+*/
+const RULES = [
+  {emoji:'🚀',title:'Bắt đầu lộ trình của bạn',desc:'Hãy tùy chỉnh các phase, thêm task và theo dõi tiến độ mỗi ngày.'},
 ];
 
 /* ─── PROGRESS HOOK ─── */

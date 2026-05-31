@@ -84,6 +84,7 @@ const SCHEDULE_COLORS: { value: string; label: string }[] = [
 const ROADMAP_PHASE_COLORS = SCHEDULE_COLORS;
 const ROADMAP_TRACK_COLORS = SCHEDULE_COLORS;
 
+/*
 const DEFAULT_SCHEDULE_EVENTS: Omit<ScheduleEventItem, 'id' | 'updatedAt'>[] = [
   { title: 'Ở công ty (intern)', day: 'mon', startMinute: 10 * 60, endMinute: 17 * 60, color: '#61dafb', note: 'React task + học từ codebase.' },
   { title: 'Backend thực hành', day: 'mon', startMinute: 19 * 60, endMinute: 20 * 60 + 30, color: '#f89820', note: 'Lý thuyết 30p + code 60p.' },
@@ -96,6 +97,8 @@ const DEFAULT_SCHEDULE_EVENTS: Omit<ScheduleEventItem, 'id' | 'updatedAt'>[] = [
   { title: 'Docker', day: 'sat', startMinute: 14 * 60, endMinute: 15 * 60, color: '#2496ed', note: 'Dockerfile / Compose.' },
   { title: 'Review tuần + IELTS', day: 'sun', startMinute: 9 * 60, endMinute: 11 * 60, color: '#c084fc', note: 'Ôn tập, không học mới.' },
 ];
+*/
+const DEFAULT_SCHEDULE_EVENTS: Omit<ScheduleEventItem, 'id' | 'updatedAt'>[] = [];
 
 const DEFAULT_TRACK_COLOR = '#61dafb';
 
