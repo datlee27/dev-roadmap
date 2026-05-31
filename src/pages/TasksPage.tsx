@@ -63,6 +63,7 @@ function TasksPage({
   formatStamp,
   formatClockTime,
 }: TasksPageProps) {
+  const [showTaskForm, setShowTaskForm] = useState<boolean>(false);
   const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>('week');
   const filteredTimeline = useMemo(() => {
     const now = new Date();
@@ -75,7 +76,20 @@ function TasksPage({
       <p className="kicker">Task Manager</p>
       <h2>Thêm và quản lý task học tập</h2>
 
-      <form className="task-form" onSubmit={onSubmit}>
+      <div className="collapsible-actions">
+        <button
+          type="button"
+          className={`collapsible-toggle ${showTaskForm ? 'open' : ''}`}
+          onClick={() => setShowTaskForm((prev) => !prev)}
+        >
+          <span className="collapsible-toggle-icon">+</span>
+          Thêm task mới
+        </button>
+      </div>
+
+      <div className={`collapsible-body ${showTaskForm ? 'open' : ''}`}>
+        <div className="collapsible-body-inner">
+          <form className="task-form" onSubmit={onSubmit}>
         <label>
           Tên task
           <input
@@ -125,6 +139,8 @@ function TasksPage({
           + Thêm task
         </button>
       </form>
+        </div>
+      </div>
 
       <div className="task-meta">
         <span>{tasks.length} task</span>

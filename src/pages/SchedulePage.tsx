@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ScheduleDayId, SchedulePageProps } from '../@types/schedule';
 
 function SchedulePage({
@@ -28,6 +29,8 @@ function SchedulePage({
   getScheduleEventStyle,
   formatClockTime,
 }: SchedulePageProps) {
+  const [showScheduleForm, setShowScheduleForm] = useState<boolean>(!!editingScheduleId);
+
   return (
     <section className="section fade-in">
       <p className="kicker">Weekly Planner</p>
@@ -38,8 +41,20 @@ function SchedulePage({
       </p>
 
       <div className="schedule-builder">
-        <form className="schedule-form" onSubmit={onSubmit}>
-          <h3>{editingScheduleId ? 'Sửa sự kiện' : 'Tạo sự kiện mới'}</h3>
+        <div className="collapsible-actions">
+          <button
+            type="button"
+            className={`collapsible-toggle ${showScheduleForm || editingScheduleId ? 'open' : ''}`}
+            onClick={() => setShowScheduleForm((prev) => !prev)}
+          >
+            <span className="collapsible-toggle-icon">+</span>
+            {editingScheduleId ? 'Sửa sự kiện' : 'Tạo sự kiện mới'}
+          </button>
+        </div>
+
+        <div className={`collapsible-body ${showScheduleForm || editingScheduleId ? 'open' : ''}`}>
+          <div className="collapsible-body-inner">
+            <form className="schedule-form" onSubmit={onSubmit}>
           <label>
             Tên sự kiện
             <input
@@ -133,6 +148,8 @@ function SchedulePage({
             )}
           </div>
         </form>
+          </div>
+        </div>
 
         <div className="weekly-calendar-wrap">
           <div className="weekly-calendar-head">

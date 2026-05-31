@@ -94,6 +94,8 @@ function PhasePage({
   normalizeMinutes,
   formatStamp,
 }: PhasePageProps) {
+  const [showPhaseEditor, setShowPhaseEditor] = useState<boolean>(false);
+  const [showPhaseTaskForm, setShowPhaseTaskForm] = useState<boolean>(false);
   const [openColorPicker, setOpenColorPicker] = useState<string | null>(null);
   const [phaseNameDraft, setPhaseNameDraft] = useState<string>(phase.label);
   const [phaseNameTouched, setPhaseNameTouched] = useState<boolean>(false);
@@ -120,6 +122,8 @@ function PhasePage({
     setPhaseNameDraft(phase.label);
     setPhaseNameTouched(false);
     setOpenColorPicker(null);
+    setShowPhaseEditor(false);
+    setShowPhaseTaskForm(false);
   }, [phase.id]);
 
   useEffect(() => {
@@ -210,113 +214,128 @@ function PhasePage({
           </div>
         </div>
 
-        <section className="phase-editor-panel">
-          <div className="phase-editor-head">
-            <div>
-              <h3>Tùy chỉnh phase</h3>
-              <p>Chỉnh nội dung phase, thêm track và step ngay tại màn hình này.</p>
-            </div>
+        <div className="collapsible-actions">
+          <button
+            type="button"
+            className={`collapsible-toggle ${showPhaseEditor ? 'open' : ''}`}
+            onClick={() => setShowPhaseEditor((prev) => !prev)}
+          >
+            <span className="collapsible-toggle-icon">+</span>
+            Tùy chỉnh phase
+          </button>
+        </div>
 
-            <div className="phase-editor-actions">
-              <button type="button" className="ghost-btn" onClick={() => onAddTrack(phase.id)}>
-                + Add Track
-              </button>
-              <button
-                type="button"
-                className="ghost-btn danger-btn"
-                disabled={!canDeletePhase}
-                onClick={() => onDeletePhase(phase.id)}
-              >
-                Xóa phase
-              </button>
-            </div>
-          </div>
-
-          <div className="phase-editor-grid">
-            <label>
-              Tên phase
-              <input
-                type="text"
-                value={phaseNameDraft}
-                className={showPhaseNameError ? 'field-invalid' : ''}
-                aria-invalid={showPhaseNameError}
-                aria-describedby={showPhaseNameError ? 'phase-name-error' : undefined}
-                onChange={(event) => {
-                  setPhaseNameDraft(event.target.value);
-                  setPhaseNameTouched(true);
-                }}
-                onBlur={commitPhaseName}
-                onKeyDown={handlePhaseNameKeyDown}
-              />
-              {showPhaseNameError && (
-                <span id="phase-name-error" className="field-error">
-                  {phaseNameError}
-                </span>
-              )}
-            </label>
-
-            <label>
-              Nhãn thời gian
-              <input
-                type="text"
-                value={phase.sublabel}
-                onChange={(event) => onUpdatePhase(phase.id, { sublabel: event.target.value })}
-                placeholder="Ví dụ: Tuần 4-6"
-              />
-            </label>
-
-            <label>
-              Mô tả ngắn
-              <input
-                type="text"
-                value={phase.desc}
-                onChange={(event) => onUpdatePhase(phase.id, { desc: event.target.value })}
-              />
-            </label>
-
-            <label>
-              Màu phase
-              <details
-                className="compact-color-picker"
-                open={openColorPicker === 'phase'}
-                onMouseEnter={clearColorPickerCloseTimer}
-                onMouseLeave={scheduleColorPickerClose}
-              >
-                <summary aria-label="Chọn màu phase" title="Chọn màu phase" onClick={(event) => toggleColorPicker(event, 'phase')}>
-                  <span className="selected-color-swatch" style={{ backgroundColor: phase.color }} />
-                </summary>
-
-                <div className="compact-color-palette">
-                  {trackColors.map((colorItem) => (
-                    <button
-                      key={colorItem.value}
-                      type="button"
-                      className={`schedule-color-swatch ${phase.color === colorItem.value ? 'active' : ''}`}
-                      style={{ backgroundColor: colorItem.value }}
-                      onClick={() => {
-                        clearColorPickerCloseTimer();
-                        onUpdatePhase(phase.id, { color: colorItem.value });
-                        setOpenColorPicker(null);
-                      }}
-                      aria-label={`Chọn màu ${colorItem.label}`}
-                      title={`${colorItem.label} (${colorItem.value})`}
-                    />
-                  ))}
+        <div className={`collapsible-body ${showPhaseEditor ? 'open' : ''}`}>
+          <div className="collapsible-body-inner">
+            <section className="phase-editor-panel">
+              <div className="phase-editor-head">
+                <div>
+                  <h3>Tùy chỉnh phase</h3>
+                  <p>Chỉnh nội dung phase, thêm track và step ngay tại màn hình này.</p>
                 </div>
-              </details>
-            </label>
-          </div>
 
-          <label className="phase-editor-goal">
-            Mục tiêu phase
-            <textarea
-              rows={3}
-              value={phase.goal}
-              onChange={(event) => onUpdatePhase(phase.id, { goal: event.target.value })}
-              placeholder="Tóm tắt mục tiêu, kết quả mong muốn sau phase..."
-            />
-          </label>
-        </section>
+                <div className="phase-editor-actions">
+                  <button type="button" className="ghost-btn" onClick={() => onAddTrack(phase.id)}>
+                    + Add Track
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-btn danger-btn"
+                    disabled={!canDeletePhase}
+                    onClick={() => onDeletePhase(phase.id)}
+                  >
+                    Xóa phase
+                  </button>
+                </div>
+              </div>
+
+              <div className="phase-editor-grid">
+                <label>
+                  Tên phase
+                  <input
+                    type="text"
+                    value={phaseNameDraft}
+                    className={showPhaseNameError ? 'field-invalid' : ''}
+                    aria-invalid={showPhaseNameError}
+                    aria-describedby={showPhaseNameError ? 'phase-name-error' : undefined}
+                    onChange={(event) => {
+                      setPhaseNameDraft(event.target.value);
+                      setPhaseNameTouched(true);
+                    }}
+                    onBlur={commitPhaseName}
+                    onKeyDown={handlePhaseNameKeyDown}
+                  />
+                  {showPhaseNameError && (
+                    <span id="phase-name-error" className="field-error">
+                      {phaseNameError}
+                    </span>
+                  )}
+                </label>
+
+                <label>
+                  Nhãn thời gian
+                  <input
+                    type="text"
+                    value={phase.sublabel}
+                    onChange={(event) => onUpdatePhase(phase.id, { sublabel: event.target.value })}
+                    placeholder="Ví dụ: Tuần 4-6"
+                  />
+                </label>
+
+                <label>
+                  Mô tả ngắn
+                  <input
+                    type="text"
+                    value={phase.desc}
+                    onChange={(event) => onUpdatePhase(phase.id, { desc: event.target.value })}
+                  />
+                </label>
+
+                <label>
+                  Màu phase
+                  <details
+                    className="compact-color-picker"
+                    open={openColorPicker === 'phase'}
+                    onMouseEnter={clearColorPickerCloseTimer}
+                    onMouseLeave={scheduleColorPickerClose}
+                  >
+                    <summary aria-label="Chọn màu phase" title="Chọn màu phase" onClick={(event) => toggleColorPicker(event, 'phase')}>
+                      <span className="selected-color-swatch" style={{ backgroundColor: phase.color }} />
+                    </summary>
+
+                    <div className="compact-color-palette">
+                      {trackColors.map((colorItem) => (
+                        <button
+                          key={colorItem.value}
+                          type="button"
+                          className={`schedule-color-swatch ${phase.color === colorItem.value ? 'active' : ''}`}
+                          style={{ backgroundColor: colorItem.value }}
+                          onClick={() => {
+                            clearColorPickerCloseTimer();
+                            onUpdatePhase(phase.id, { color: colorItem.value });
+                            setOpenColorPicker(null);
+                          }}
+                          aria-label={`Chọn màu ${colorItem.label}`}
+                          title={`${colorItem.label} (${colorItem.value})`}
+                        />
+                      ))}
+                    </div>
+                  </details>
+                </label>
+              </div>
+
+              <label className="phase-editor-goal">
+                Mục tiêu phase
+                <textarea
+                  rows={3}
+                  value={phase.goal}
+                  onChange={(event) => onUpdatePhase(phase.id, { goal: event.target.value })}
+                  placeholder="Tóm tắt mục tiêu, kết quả mong muốn sau phase..."
+                />
+              </label>
+            </section>
+          </div>
+        </div>
 
         <div className="track-grid">
           {phase.tracks.length === 0 && (
@@ -419,9 +438,18 @@ function PhasePage({
         </div>
 
         <section className="phase-extra">
-          <h3 className="phase-extra-title">Thêm task trong {phase.label}</h3>
+          <button
+            type="button"
+            className={`collapsible-toggle ${showPhaseTaskForm ? 'open' : ''}`}
+            onClick={() => setShowPhaseTaskForm((prev) => !prev)}
+          >
+            <span className="collapsible-toggle-icon">+</span>
+            Thêm task trong {phase.label}
+          </button>
 
-          <form className="task-form" onSubmit={(event) => onAddPhaseTask(event, phase.id)}>
+          <div className={`collapsible-body ${showPhaseTaskForm ? 'open' : ''}`}>
+            <div className="collapsible-body-inner">
+              <form className="task-form" onSubmit={(event) => onAddPhaseTask(event, phase.id)}>
             <label>
               Tên task phase
               <input
@@ -475,7 +503,9 @@ function PhasePage({
             <button className="primary-btn" type="submit">
               + Thêm task cho phase
             </button>
-          </form>
+              </form>
+            </div>
+          </div>
 
           <div className="task-meta">
             <span>{phaseTaskList.length} task phase</span>

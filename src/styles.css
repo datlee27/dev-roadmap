@@ -1440,6 +1440,70 @@ textarea {
   color: var(--text-soft);
 }
 
+/* ── Collapsible toggle panels ─────────────────── */
+
+.collapsible-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--panel-elevated);
+  color: var(--text);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.collapsible-toggle:hover {
+  border-color: var(--highlight);
+  background: var(--hover-surface);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--highlight) 12%, transparent);
+}
+
+.collapsible-toggle.open {
+  border-color: var(--highlight);
+  background: color-mix(in srgb, var(--highlight-bg) 10%, var(--panel-elevated));
+}
+
+.collapsible-toggle-icon {
+  display: inline-flex;
+  transition: transform 0.24s ease;
+  font-size: 1rem;
+}
+
+.collapsible-toggle.open .collapsible-toggle-icon {
+  transform: rotate(45deg);
+}
+
+.collapsible-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s ease, opacity 0.22s ease, margin 0.28s ease;
+  opacity: 0;
+  margin-top: 0;
+}
+
+.collapsible-body.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 0.75rem;
+}
+
+.collapsible-body-inner {
+  overflow: hidden;
+}
+
+.collapsible-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+}
+
 .task-meta {
   margin: 1rem 0 0.6rem;
   display: flex;
