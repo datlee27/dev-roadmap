@@ -1,5 +1,7 @@
 import { NavItem, NavSection } from '../../@types/navigation';
 
+type AppTheme = 'light' | 'dark';
+
 interface AppHeaderProps {
   sections: NavItem[];
   activeSection: NavSection;
@@ -8,6 +10,8 @@ interface AppHeaderProps {
   roadmapProgress: number;
   isDashboardOpen: boolean;
   onToggleDashboard: () => void;
+  theme: AppTheme;
+  onToggleTheme: () => void;
 }
 
 function AppHeader({
@@ -18,7 +22,11 @@ function AppHeader({
   roadmapProgress,
   isDashboardOpen,
   onToggleDashboard,
+  theme,
+  onToggleTheme,
 }: AppHeaderProps) {
+  const nextThemeLabel = theme === 'dark' ? 'sáng' : 'tối';
+
   return (
     <header className="topbar">
       <div className="brand-wrap">
@@ -60,11 +68,34 @@ function AppHeader({
         ))}
       </nav>
 
-      <div className="progress-chip">
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${roadmapProgress}%` }} />
+      <div className="topbar-actions">
+        <button
+          type="button"
+          className="theme-toggle-btn"
+          onClick={onToggleTheme}
+          aria-label={`Chuyển sang chế độ ${nextThemeLabel}`}
+          aria-pressed={theme === 'dark'}
+          title={`Chuyển sang chế độ ${nextThemeLabel}`}
+        >
+          <span className={`theme-toggle-icon ${theme === 'light' ? 'active' : ''}`} aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 4V2.5M12 21.5V20M4 12H2.5M21.5 12H20M6.34 6.34L5.28 5.28M18.72 18.72L17.66 17.66M17.66 6.34L18.72 5.28M5.28 18.72L6.34 17.66" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+          </span>
+          <span className={`theme-toggle-icon ${theme === 'dark' ? 'active' : ''}`} aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M20 15.5A7.5 7.5 0 0 1 8.5 4A8.2 8.2 0 1 0 20 15.5Z" />
+            </svg>
+          </span>
+        </button>
+
+        <div className="progress-chip">
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${roadmapProgress}%` }} />
+          </div>
+          <span>{roadmapProgress}%</span>
         </div>
-        <span>{roadmapProgress}%</span>
       </div>
     </header>
   );

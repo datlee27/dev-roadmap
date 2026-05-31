@@ -5,11 +5,12 @@ interface AppLayoutProps {
   sidebar: ReactNode;
   children: ReactNode;
   footer: ReactNode;
+  theme: 'light' | 'dark';
 }
 
-function AppLayout({ header, sidebar, children, footer }: AppLayoutProps) {
+function AppLayout({ header, sidebar, children, footer, theme }: AppLayoutProps) {
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       {header}
       <div className="app-layout">
         {sidebar}

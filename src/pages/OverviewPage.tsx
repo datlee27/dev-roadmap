@@ -1,5 +1,4 @@
 import { CSSProperties } from 'react';
-import { RULES } from '../data';
 import { Phase, PhaseId } from '../types';
 
 interface OverviewPageProps {

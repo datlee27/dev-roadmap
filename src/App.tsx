@@ -22,6 +22,8 @@ const GENERAL_NOTE_STORAGE_KEY = 'dev-roadmap-v2-general-note';
 const SCHEDULE_STORAGE_KEY = 'dev-roadmap-v3-schedule';
 const SCHEDULE_TIMELINE_STORAGE_KEY = 'dev-roadmap-v3-schedule-timeline';
 const ROADMAP_CONFIG_STORAGE_KEY = 'dev-roadmap-v4-config';
+const THEME_STORAGE_KEY = 'dev-roadmap-v1-theme';
+type AppTheme = 'light' | 'dark';
 type StepNoteMap = Record<string, string>;
 
 interface TaskDraft {
@@ -341,6 +343,15 @@ const loadInitialRoadmapConfig = (): RoadmapConfig => {
   }
 };
 
+const loadInitialTheme = (): AppTheme => {
+  try {
+    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    return storedTheme === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+};
+
 const createPhaseDraftMap = (
   phaseIds: PhaseId[],
   previous: Record<PhaseId, TaskDraft> = {},
@@ -433,6 +444,7 @@ const formatStamp = (value: string): string =>
   });
 
 function App() {
+  const [theme, setTheme] = useState<AppTheme>(loadInitialTheme);
   const [roadmapConfig, setRoadmapConfig] = useState<RoadmapConfig>(loadInitialRoadmapConfig);
   const phases = roadmapConfig.phases;
   const tracks = roadmapConfig.tracks;
@@ -526,6 +538,12 @@ function App() {
     }
   });
   const phaseIds = useMemo(() => phases.map((phase) => phase.id), [phases]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     localStorage.setItem(ROADMAP_STORAGE_KEY, JSON.stringify([...doneSet]));
@@ -1292,6 +1310,7 @@ function App() {
 
   return (
     <AppLayout
+      theme={theme}
       header={
         <AppHeader
           sections={topNavSections}
@@ -1301,6 +1320,8 @@ function App() {
           roadmapProgress={roadmapProgress}
           isDashboardOpen={isDashboardOpen}
           onToggleDashboard={() => setIsDashboardOpen((prev) => !prev)}
+          theme={theme}
+          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         />
       }
       sidebar={
